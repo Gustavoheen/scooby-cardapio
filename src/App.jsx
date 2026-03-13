@@ -27,7 +27,6 @@ function calcLojaAberta(state) {
 export default function App() {
   if (window.location.pathname === '/admin') return <Admin />
 
-  const lojaAberta = calcLojaAberta(cardapioState)
   const [categoriaAtiva, setCategoriaAtiva] = useState(categorias[0].id)
   const [drawerAberto, setDrawerAberto] = useState(false)
   const [modalAberto, setModalAberto] = useState(false)
@@ -36,6 +35,8 @@ export default function App() {
   const [senhaAdmin, setSenhaAdmin] = useState('')
   const [erroAdmin, setErroAdmin] = useState(false)
   const [cardapioState, setCardapioState] = useState({ precos: {}, desativados: [] })
+
+  const lojaAberta = calcLojaAberta(cardapioState)
 
   useEffect(() => {
     fetch('/api/cardapio-state').then(r => r.json()).then(setCardapioState).catch(() => {})
