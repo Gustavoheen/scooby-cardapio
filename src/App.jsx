@@ -8,11 +8,16 @@ import { CarrinhoSidebar } from './components/CarrinhoSidebar'
 import { ModalPedido } from './components/ModalPedido'
 import { CONFIG } from './config'
 
-function lojaEstaAberta() {
-  if (localStorage.getItem('scooby_loja_forcada') === 'true') return true
+function calcLojaAberta(state) {
+  const status = state.lojaStatus
+  if (status === 'aberta') return true
+  if (status === 'fechada') return false
+  // 'auto' ou indefinido: verifica horário
+  const abertura  = state.horarioAbertura  || CONFIG.horarioAbertura
+  const fechamento = state.horarioFechamento || CONFIG.horarioFechamento
   const agora = new Date()
-  const [hA, mA] = CONFIG.horarioAbertura.split(':').map(Number)
-  const [hF, mF] = CONFIG.horarioFechamento.split(':').map(Number)
+  const [hA, mA] = abertura.split(':').map(Number)
+  const [hF, mF] = fechamento.split(':').map(Number)
   const minAgora  = agora.getHours() * 60 + agora.getMinutes()
   const minAbertu = hA * 60 + mA
   const minFecha  = hF * 60 + mF
@@ -22,7 +27,7 @@ function lojaEstaAberta() {
 export default function App() {
   if (window.location.pathname === '/admin') return <Admin />
 
-  const lojaAberta = lojaEstaAberta()
+  const lojaAberta = calcLojaAberta(cardapioState)
   const [categoriaAtiva, setCategoriaAtiva] = useState(categorias[0].id)
   const [drawerAberto, setDrawerAberto] = useState(false)
   const [modalAberto, setModalAberto] = useState(false)
@@ -184,7 +189,7 @@ export default function App() {
                 {lojaAberta ? '🟢 Aberto agora' : '🔴 Fechado agora'}
               </span>
               <span className="bg-scooby-card border border-scooby-borda text-gray-300 text-xs px-3 py-1.5 rounded-full">
-                ⏰ {CONFIG.horarioAbertura} – {CONFIG.horarioFechamento}
+                ⏰ {cardapioState.horarioAbertura || CONFIG.horarioAbertura} – {cardapioState.horarioFechamento || CONFIG.horarioFechamento}
               </span>
               <span className="bg-scooby-card border border-scooby-borda text-gray-300 text-xs px-3 py-1.5 rounded-full">
                 🚗 Entrega R$ {CONFIG.taxaEntrega.toFixed(2).replace('.', ',')}
@@ -197,7 +202,7 @@ export default function App() {
             {!lojaAberta && (
               <div className="mt-4 bg-red-900/40 border border-red-700/60 text-red-300 text-sm font-medium px-5 py-3 rounded-2xl text-center max-w-sm">
                 😴 Estamos fechados no momento.<br />
-                <span className="text-red-400 font-bold">Abrimos às {CONFIG.horarioAbertura}h</span>
+                <span className="text-red-400 font-bold">Abrimos às {cardapioState.horarioAbertura || CONFIG.horarioAbertura}h</span>
               </div>
             )}
           </div>

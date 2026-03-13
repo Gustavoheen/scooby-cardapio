@@ -241,9 +241,10 @@ export default function Admin() {
   const [filtroRapido, setFiltroRapido] = useState('hoje')
   const [pagamentoFiltro, setPagamentoFiltro] = useState('')
   const [ultimaAtualizacao, setUltimaAtualizacao] = useState(null)
-  const [lojaForcada, setLojaForcada] = useState(
-    localStorage.getItem('scooby_loja_forcada') === 'true'
-  )
+  const [lojaStatus, setLojaStatus] = useState('auto') // 'auto' | 'aberta' | 'fechada'
+  const [horarioAberturaEditado, setHorarioAberturaEditado] = useState(CONFIG.horarioAbertura)
+  const [horarioFechamentoEditado, setHorarioFechamentoEditado] = useState(CONFIG.horarioFechamento)
+  const [salvandoStatus, setSalvandoStatus] = useState(false)
   const [abaAtiva, setAbaAtiva] = useState('pedidos')
   const [buscaCliente, setBuscaCliente] = useState('')
 
@@ -268,14 +269,38 @@ export default function Admin() {
   const [msgSenha, setMsgSenha] = useState('')
   const [salvandoSenha, setSalvandoSenha] = useState(false)
 
-  function toggleLoja() {
-    const novoValor = !lojaForcada
-    setLojaForcada(novoValor)
-    if (novoValor) {
-      localStorage.setItem('scooby_loja_forcada', 'true')
-    } else {
-      localStorage.removeItem('scooby_loja_forcada')
+  function buildPayload(extras = {}) {
+    const precosFinal = {}
+    Object.entries(precosEditados).forEach(([id, val]) => {
+      const num = parseFloat(String(val).replace(',', '.'))
+      if (!isNaN(num) && num > 0) precosFinal[id] = num
+    })
+    return {
+      precos: precosFinal,
+      desativados: desativadosEditados,
+      precosVariacoes: precosVariacoesEditados,
+      taxaEntrega: parseFloat(String(taxaEntregaEditada).replace(',', '.')) || CONFIG.taxaEntrega,
+      tempoEntrega: tempoEntregaEditado.trim() || CONFIG.tempoEntrega,
+      promocoes: promocoesEditadas,
+      cupons: cuponsEditados,
+      lojaStatus,
+      horarioAbertura: horarioAberturaEditado,
+      horarioFechamento: horarioFechamentoEditado,
+      ...extras,
     }
+  }
+
+  async function salvarStatusLoja(novoStatus) {
+    setSalvandoStatus(true)
+    setLojaStatus(novoStatus)
+    try {
+      await fetch('/api/cardapio-state', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(buildPayload({ lojaStatus: novoStatus })),
+      })
+    } catch {}
+    setSalvandoStatus(false)
   }
 
   const buscarPedidos = useCallback(async () => {
@@ -332,6 +357,9 @@ export default function Admin() {
         setTempoEntregaEditado(estado.tempoEntrega ?? CONFIG.tempoEntrega)
         setPromocoesEditadas(estado.promocoes || [])
         setCuponsEditados(estado.cupons || [])
+        setLojaStatus(estado.lojaStatus || 'auto')
+        setHorarioAberturaEditado(estado.horarioAbertura || CONFIG.horarioAbertura)
+        setHorarioFechamentoEditado(estado.horarioFechamento || CONFIG.horarioFechamento)
         // Restaura sessão
         const salvo = sessionStorage.getItem('admin_auth')
         if (salvo === 'master') {
@@ -371,27 +399,13 @@ export default function Admin() {
     setSalvandoCardapio(true)
     setMsgCardapio('')
     try {
-      const precosFinal = {}
-      Object.entries(precosEditados).forEach(([id, val]) => {
-        const num = parseFloat(String(val).replace(',', '.'))
-        if (!isNaN(num) && num > 0) precosFinal[id] = num
-      })
+      const payload = buildPayload()
       const res = await fetch('/api/cardapio-state', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          precos: precosFinal,
-          desativados: desativadosEditados,
-          precosVariacoes: precosVariacoesEditados,
-          taxaEntrega: parseFloat(String(taxaEntregaEditada).replace(',', '.')) || CONFIG.taxaEntrega,
-          tempoEntrega: tempoEntregaEditado.trim() || CONFIG.tempoEntrega,
-          promocoes: promocoesEditadas,
-          cupons: cuponsEditados,
-        }),
+        body: JSON.stringify(payload),
       })
       if (res.ok) {
-        const taxaFinal = parseFloat(String(taxaEntregaEditada).replace(',', '.')) || CONFIG.taxaEntrega
-        setCardapioState({ precos: precosFinal, desativados: desativadosEditados, precosVariacoes: precosVariacoesEditados, taxaEntrega: taxaFinal, promocoes: promocoesEditadas, cupons: cuponsEditados })
         setMsgCardapio('Alterações salvas com sucesso!')
       } else {
         setMsgCardapio('Erro ao salvar. Tente novamente.')
@@ -456,25 +470,10 @@ export default function Admin() {
     }
     setSalvandoSenha(true)
     try {
-      // Monta payload com todos os estados atuais + nova senha
-      const precosFinal = {}
-      Object.entries(precosEditados).forEach(([id, val]) => {
-        const num = parseFloat(String(val).replace(',', '.'))
-        if (!isNaN(num) && num > 0) precosFinal[id] = num
-      })
       const res = await fetch('/api/cardapio-state', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          precos: precosFinal,
-          desativados: desativadosEditados,
-          precosVariacoes: precosVariacoesEditados,
-          taxaEntrega: parseFloat(String(taxaEntregaEditada).replace(',', '.')) || CONFIG.taxaEntrega,
-          tempoEntrega: tempoEntregaEditado.trim() || CONFIG.tempoEntrega,
-          promocoes: promocoesEditadas,
-          cupons: cuponsEditados,
-          senhaCliente: novaSenhaInput,
-        }),
+        body: JSON.stringify(buildPayload({ senhaCliente: novaSenhaInput })),
       })
       if (res.ok) {
         setSenhaClienteAtual(novaSenhaInput)
@@ -710,17 +709,32 @@ export default function Admin() {
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <button
-            onClick={toggleLoja}
-            className={`flex items-center gap-2 font-bold text-sm px-4 py-2 rounded-xl border-2 transition ${
-              lojaForcada
-                ? 'bg-green-600 border-green-400 text-white hover:bg-green-700'
-                : 'bg-gray-800 border-gray-600 text-gray-300 hover:bg-gray-700'
-            }`}
-          >
-            <span className={`w-2.5 h-2.5 rounded-full ${lojaForcada ? 'bg-green-300 animate-pulse' : 'bg-gray-500'}`}></span>
-            {lojaForcada ? 'Loja Aberta' : 'Loja Fechada'}
-          </button>
+          <div className="flex items-center bg-scooby-escuro border border-scooby-borda rounded-xl p-1 gap-0.5">
+            <button
+              onClick={() => salvarStatusLoja('auto')}
+              disabled={salvandoStatus}
+              title="Abre/fecha conforme horário automático"
+              className={`flex items-center gap-1.5 text-xs font-bold px-3 py-2 rounded-lg transition disabled:opacity-60 ${lojaStatus === 'auto' ? 'bg-yellow-500 text-black' : 'text-gray-400 hover:text-white'}`}
+            >
+              ⏰ Auto
+            </button>
+            <button
+              onClick={() => salvarStatusLoja('aberta')}
+              disabled={salvandoStatus}
+              title="Força abertura independente do horário"
+              className={`flex items-center gap-1.5 text-xs font-bold px-3 py-2 rounded-lg transition disabled:opacity-60 ${lojaStatus === 'aberta' ? 'bg-green-600 text-white' : 'text-gray-400 hover:text-white'}`}
+            >
+              🟢 Aberta
+            </button>
+            <button
+              onClick={() => salvarStatusLoja('fechada')}
+              disabled={salvandoStatus}
+              title="Força fechamento independente do horário"
+              className={`flex items-center gap-1.5 text-xs font-bold px-3 py-2 rounded-lg transition disabled:opacity-60 ${lojaStatus === 'fechada' ? 'bg-red-700 text-white' : 'text-gray-400 hover:text-white'}`}
+            >
+              🔴 Fechada
+            </button>
+          </div>
           {isMaster && (
             <div className="flex items-center gap-2">
               {msgDeploy && <span className="text-xs text-green-300 font-semibold">{msgDeploy}</span>}
@@ -1071,6 +1085,32 @@ export default function Admin() {
                   className="w-48 bg-scooby-escuro border border-scooby-borda text-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-scooby-amarelo"
                 />
                 <span className="text-gray-500 text-xs">aparece no cabeçalho do site</span>
+              </div>
+            </div>
+
+            <div className="border-t border-scooby-borda pt-4">
+              <h3 className="text-scooby-amarelo font-bold text-sm mb-1">🕐 Horário de Funcionamento</h3>
+              <p className="text-gray-500 text-xs mb-3">Usado quando o status está em <span className="text-yellow-400 font-semibold">⏰ Auto</span></p>
+              <div className="flex items-center gap-3 flex-wrap">
+                <div className="flex items-center gap-2">
+                  <span className="text-gray-400 text-sm">Abre às</span>
+                  <input
+                    type="time"
+                    value={horarioAberturaEditado}
+                    onChange={e => setHorarioAberturaEditado(e.target.value)}
+                    className="bg-scooby-escuro border border-scooby-borda text-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-scooby-amarelo"
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-gray-400 text-sm">Fecha às</span>
+                  <input
+                    type="time"
+                    value={horarioFechamentoEditado}
+                    onChange={e => setHorarioFechamentoEditado(e.target.value)}
+                    className="bg-scooby-escuro border border-scooby-borda text-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-scooby-amarelo"
+                  />
+                </div>
+                <span className="text-gray-500 text-xs">salvo junto com "Salvar alterações"</span>
               </div>
             </div>
           </div>
