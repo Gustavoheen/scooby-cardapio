@@ -1,0 +1,71 @@
+name: Testes Automáticos — Scooby-Doo Lanches
+
+on:
+  schedule:
+    - cron: '0 11 * * 1,4'  # Segunda e quinta às 8h BRT (11h UTC)
+  workflow_dispatch:          # Permite rodar manualmente pelo GitHub
+
+jobs:
+  testar-banco:
+    name: Testar Supabase e APIs
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Testar tabela orders (Supabase)
+        run: |
+          R=$(curl -s -o /dev/null -w "%{http_code}" "${{ secrets.SUPABASE_URL }}/rest/v1/orders?limit=1" \
+            -H "apikey: ${{ secrets.SUPABASE_SERVICE_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_KEY }}")
+          [ "$R" = "200" ] && echo "✅ orders OK" || (echo "❌ orders FALHOU (HTTP $R)" && exit 1)
+
+      - name: Testar tabela store_state (Supabase)
+        run: |
+          R=$(curl -s -o /dev/null -w "%{http_code}" "${{ secrets.SUPABASE_URL }}/rest/v1/store_state?id=eq.1" \
+            -H "apikey: ${{ secrets.SUPABASE_SERVICE_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_KEY }}")
+          [ "$R" = "200" ] && echo "✅ store_state OK" || (echo "❌ store_state FALHOU (HTTP $R)" && exit 1)
+
+      - name: Testar tabela clients (Supabase)
+        run: |
+          TEL="32000000000"
+          R=$(curl -s -o /dev/null -w "%{http_code}" -X POST "${{ secrets.SUPABASE_URL }}/rest/v1/clients" \
+            -H "apikey: ${{ secrets.SUPABASE_SERVICE_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_KEY }}" \
+            -H "Content-Type: application/json" \
+            -H "Prefer: return=minimal" \
+            -d "{\"telefone\":\"${TEL}\",\"nome\":\"TESTE_AUTO\",\"enderecos\":[]}")
+          curl -s -X DELETE "${{ secrets.SUPABASE_URL }}/rest/v1/clients?telefone=eq.${TEL}" \
+            -H "apikey: ${{ secrets.SUPABASE_SERVICE_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_KEY }}" > /dev/null
+          [ "$R" = "201" ] && echo "✅ clients OK" || (echo "❌ clients FALHOU (HTTP $R)" && exit 1)
+
+      - name: Testar API /api/pedido
+        run: |
+          R=$(curl -s -o /dev/null -w "%{http_code}" https://scooby-cardapio.vercel.app/api/pedido)
+          [ "$R" = "200" ] && echo "✅ /api/pedido OK" || (echo "❌ /api/pedido FALHOU (HTTP $R)" && exit 1)
+
+      - name: Testar API /api/cardapio-state
+        run: |
+          R=$(curl -s -o /dev/null -w "%{http_code}" https://scooby-cardapio.vercel.app/api/cardapio-state)
+          [ "$R" = "200" ] && echo "✅ /api/cardapio-state OK" || (echo "❌ /api/cardapio-state FALHOU (HTTP $R)" && exit 1)
+
+      - name: Testar API /api/clientes
+        run: |
+          TEL="32000000001"
+          # POST
+          R=$(curl -s -o /dev/null -w "%{http_code}" -X POST https://scooby-cardapio.vercel.app/api/clientes \
+            -H "Content-Type: application/json" \
+            -d "{\"telefone\":\"${TEL}\",\"nome\":\"TESTE_AUTO\"}")
+          [ "$R" = "200" ] && echo "✅ /api/clientes POST OK" || (echo "❌ /api/clientes POST FALHOU (HTTP $R)" && exit 1)
+          # GET
+          R=$(curl -s -o /dev/null -w "%{http_code}" "https://scooby-cardapio.vercel.app/api/clientes?telefone=${TEL}")
+          # Cleanup
+          curl -s -X DELETE "${{ secrets.SUPABASE_URL }}/rest/v1/clients?telefone=eq.${TEL}" \
+            -H "apikey: ${{ secrets.SUPABASE_SERVICE_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_KEY }}" > /dev/null
+          [ "$R" = "200" ] && echo "✅ /api/clientes GET OK" || (echo "❌ /api/clientes GET FALHOU (HTTP $R)" && exit 1)
+
+      - name: Testar site no ar
+        run: |
+          R=$(curl -s -o /dev/null -w "%{http_code}" https://scooby-cardapio.vercel.app)
+          [ "$R" = "200" ] && echo "✅ site online OK" || (echo "❌ site fora do ar (HTTP $R)" && exit 1)
