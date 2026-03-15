@@ -28,9 +28,47 @@ module.exports = async function handler(req, res) {
     }
 
     if (req.method === 'POST') {
-      const id = Date.now()
+      // ── 1. Honeypot — bots preenchem campos escondidos ────────────
+      if (req.body._hp) {
+        // Rejeita silenciosamente sem alertar o bot
+        return res.status(200).json({ sucesso: true, numeroPedido: 'OK' })
+      }
 
-      // Gera número sequencial do dia consultando o banco
+      // ── 2. Validação básica ───────────────────────────────────────
+      const { nomeCliente, telefone, itensPedido, total } = req.body
+      if (!nomeCliente?.trim() || !itensPedido?.trim() || !total || parseFloat(total) <= 0) {
+        return res.status(400).json({ erro: 'Pedido inválido.' })
+      }
+
+      const telNorm = (telefone || '').replace(/\D/g, '')
+
+      // ── 3. Carregar blocklist e checar rate limit em paralelo ─────
+      const umaHoraAtras = new Date(Date.now() - 60 * 60 * 1000).toISOString()
+
+      const [storeResult, rateResult] = await Promise.all([
+        supabase.from('store_state').select('bloqueados').eq('id', 1).single(),
+        telNorm
+          ? supabase
+              .from('orders')
+              .select('*', { count: 'exact', head: true })
+              .filter('data->>telefone', 'eq', telNorm)
+              .gte('criadoEm', umaHoraAtras)
+          : Promise.resolve({ count: 0 }),
+      ])
+
+      // ── 4. Blocklist ──────────────────────────────────────────────
+      const bloqueados = storeResult.data?.bloqueados || []
+      if (telNorm && bloqueados.includes(telNorm)) {
+        return res.status(403).json({ erro: 'Não foi possível processar seu pedido. Entre em contato com a loja.' })
+      }
+
+      // ── 5. Rate limiting: máx 5 pedidos por hora por telefone ─────
+      if (telNorm && (rateResult.count || 0) >= 5) {
+        return res.status(429).json({ erro: 'Muitos pedidos em pouco tempo. Aguarde alguns minutos antes de tentar novamente.' })
+      }
+
+      // ── 6. Salvar pedido ──────────────────────────────────────────
+      const id = Date.now()
       const hoje = new Date().toLocaleDateString('pt-BR')
       const { count } = await supabase
         .from('orders')
@@ -38,13 +76,17 @@ module.exports = async function handler(req, res) {
         .filter('data->>data', 'eq', hoje)
       const numeroPedido = `${hoje.replace(/\//g, '')}-${String((count || 0) + 1).padStart(3, '0')}`
 
-      const payload = { ...req.body, numeroPedido }
+      // Remove honeypot do payload antes de salvar
+      const { _hp, ...bodyLimpo } = req.body
+      const payload = { ...bodyLimpo, telefone: telNorm || telefone, numeroPedido }
+
       const { error } = await supabase
         .from('orders')
         .insert({ id, data: payload })
       if (error) throw error
       return res.status(200).json({ sucesso: true, numeroPedido })
     }
+
     if (req.method === 'DELETE') {
       const { id, telefone } = req.query
       if (id) {

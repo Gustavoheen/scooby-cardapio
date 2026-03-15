@@ -10,6 +10,7 @@ export async function salvarPedido(dados, itens, subtotal, taxaEntregaDinamica =
 
   const agora = new Date()
   const payload = {
+    _hp:          '',  // honeypot — bots preenchem, humanos não
     data:         agora.toLocaleDateString('pt-BR'),
     hora:         agora.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
     nomeCliente:  dados.nome,

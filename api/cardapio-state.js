@@ -32,7 +32,7 @@ module.exports = async function handler(req, res) {
         precos = {}, desativados = [], precosVariacoes = {},
         taxaEntrega, tempoEntrega, promocoes, cupons,
         senhaCliente, lojaStatus, horarioAbertura, horarioFechamento,
-        whatsappNumero, pixChave, pixTipo, pixNome,
+        whatsappNumero, pixChave, pixTipo, pixNome, bloqueados,
       } = req.body
 
       const estado = {
@@ -54,6 +54,7 @@ module.exports = async function handler(req, res) {
       if (pixChave !== undefined) estado.pixChave = pixChave
       if (pixTipo !== undefined) estado.pixTipo = pixTipo
       if (pixNome !== undefined) estado.pixNome = pixNome
+      if (bloqueados !== undefined) estado.bloqueados = bloqueados
 
       const { error } = await supabase
         .from('store_state')

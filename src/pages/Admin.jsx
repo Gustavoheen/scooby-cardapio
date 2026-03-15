@@ -537,6 +537,8 @@ export default function Admin() {
   const [salvandoStatus, setSalvandoStatus] = useState(false)
   const [abaAtiva, setAbaAtiva] = useState('pedidos')
   const [buscaCliente, setBuscaCliente] = useState('')
+  const [bloqueados, setBloqueados] = useState([])
+  const [novoBloquear, setNovoBloquear] = useState('')
 
   // ── Estado da aba Cardápio ─────────────────────────────────
   const [cardapioState, setCardapioState] = useState({ precos: {}, desativados: [] })
@@ -660,6 +662,7 @@ export default function Admin() {
         setPixTipoEditado(estado.pixTipo || CONFIG.pixTipo)
         setPixNomeEditado(estado.pixNome || CONFIG.pixNome)
         setLojaStatus(estado.lojaStatus || 'auto')
+        setBloqueados(estado.bloqueados || [])
         setHorarioAberturaEditado(estado.horarioAbertura || CONFIG.horarioAbertura)
         setHorarioFechamentoEditado(estado.horarioFechamento || CONFIG.horarioFechamento)
         // Restaura sessão
@@ -773,6 +776,30 @@ export default function Admin() {
       setSalvandoConfig(false)
       setTimeout(() => setMsgConfig(''), 3000)
     }
+  }
+
+  async function bloquearTelefone() {
+    const tel = novoBloquear.replace(/\D/g, '')
+    if (!tel || tel.length < 10) return
+    if (bloqueados.includes(tel)) return
+    const nova = [...bloqueados, tel]
+    setBloqueados(nova)
+    setNovoBloquear('')
+    await fetch('/api/cardapio-state', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(buildPayload({ bloqueados: nova })),
+    })
+  }
+
+  async function desbloquearTelefone(tel) {
+    const nova = bloqueados.filter(t => t !== tel)
+    setBloqueados(nova)
+    await fetch('/api/cardapio-state', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(buildPayload({ bloqueados: nova })),
+    })
   }
 
   async function salvarNovaSenha() {
@@ -2071,6 +2098,54 @@ export default function Admin() {
                 </div>
               </div>
             )}
+          </div>
+
+          {/* ── Segurança ── */}
+          <div className="bg-scooby-card border border-scooby-borda rounded-2xl p-5 space-y-4">
+            <h3 className="text-scooby-amarelo font-bold text-sm">🔒 Segurança</h3>
+
+            <div className="space-y-1">
+              <p className="text-gray-300 text-xs">✅ <strong>Honeypot</strong> — campo invisível que bloqueia bots automaticamente</p>
+              <p className="text-gray-300 text-xs">✅ <strong>Rate limit</strong> — máx. 5 pedidos por número por hora</p>
+              <p className="text-gray-300 text-xs">✅ <strong>Validação</strong> — pedidos incompletos ou com valor zerado são rejeitados</p>
+            </div>
+
+            <div>
+              <p className="text-gray-400 text-xs font-semibold uppercase tracking-wide mb-2">📵 Números bloqueados</p>
+              {bloqueados.length === 0 && (
+                <p className="text-gray-600 text-xs mb-2">Nenhum número bloqueado.</p>
+              )}
+              <div className="space-y-1 mb-3">
+                {bloqueados.map(tel => (
+                  <div key={tel} className="flex items-center justify-between bg-scooby-escuro rounded-lg px-3 py-2">
+                    <span className="text-white text-sm font-mono">{tel}</span>
+                    <button
+                      onClick={() => desbloquearTelefone(tel)}
+                      className="text-xs text-red-400 hover:text-red-300 font-semibold"
+                    >
+                      Desbloquear
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <div className="flex gap-2">
+                <input
+                  type="tel"
+                  placeholder="DDD + número (ex: 32999001234)"
+                  value={novoBloquear}
+                  onChange={e => setNovoBloquear(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && bloquearTelefone()}
+                  className="flex-1 bg-scooby-escuro border border-scooby-borda text-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-red-500 font-mono"
+                />
+                <button
+                  onClick={bloquearTelefone}
+                  className="px-4 py-2 bg-red-900/60 hover:bg-red-800/60 text-red-300 text-sm font-semibold rounded-xl transition"
+                >
+                  Bloquear
+                </button>
+              </div>
+              <p className="text-gray-600 text-xs mt-1">Digite apenas números. O bloqueio impede novos pedidos desse número.</p>
+            </div>
           </div>
 
           {msgConfig && (
