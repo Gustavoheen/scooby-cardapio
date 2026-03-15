@@ -675,6 +675,24 @@ export default function Admin() {
     }
   }
 
+  // Conecta automaticamente ao abrir o painel
+  useEffect(() => {
+    async function autoConectar() {
+      try {
+        qz.security.setCertificatePromise((resolve) => resolve(CERTIFICATE))
+        qz.security.setSignatureAlgorithm('SHA512')
+        qz.security.setSignaturePromise((toSign) => (resolve, reject) =>
+          assinarQZ(toSign).then(resolve).catch(reject)
+        )
+        if (!qz.websocket.isActive()) await qz.websocket.connect()
+        setImpressoraConectada(true)
+      } catch {
+        // QZ Tray não está rodando — sem erro, usuário conecta manualmente
+      }
+    }
+    autoConectar()
+  }, [])
+
   async function desconectarImpressora() {
     try { await qz.websocket.disconnect() } catch {}
     setImpressoraConectada(false)
