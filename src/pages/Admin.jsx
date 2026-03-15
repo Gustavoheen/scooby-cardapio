@@ -228,9 +228,36 @@ function CardStat({ label, valor, sub, cor }) {
   )
 }
 
+function gerarMsgWhatsApp(pedido) {
+  const id = pedido.numeroPedido || pedido.id
+  const itens = pedido.itensPedido.replace(/ \| /g, '\n• ')
+  const isPix = pedido.pagamento === 'Pix'
+  const linhas = [
+    `Olá ${pedido.nomeCliente}! 😊 Recebemos seu pedido na *Scooby-Doo Lanches*.`,
+    ``,
+    `📋 *Pedido:* ${id}`,
+    `🍔 *Itens:*\n• ${itens}`,
+    `💰 *Total:* R$ ${pedido.total}`,
+    `💳 *Pagamento:* ${pedido.pagamento}`,
+  ]
+  if (isPix) linhas.push(`\n⚠️ Aguardando comprovante do Pix para confirmar e iniciar o preparo!`)
+  else if (pedido.tipoEntrega === 'Entrega') linhas.push(`\n🛵 Seu pedido será entregue em breve!`)
+  else linhas.push(`\n🏠 Seu pedido estará pronto para retirada em breve!`)
+  return encodeURIComponent(linhas.join('\n'))
+}
+
 function CardPedido({ pedido, onImprimir, selecionado, onToggleSelecionado, infoImpressao }) {
   const [expandido, setExpandido] = useState(false)
+  const detalhesRef = useRef(null)
   const id = pedido.numeroPedido || pedido.id
+  const tel = pedido.telefone?.replace(/\D/g, '')
+  const waLink = tel ? `https://wa.me/55${tel}?text=${gerarMsgWhatsApp(pedido)}` : null
+
+  useEffect(() => {
+    if (expandido && detalhesRef.current) {
+      setTimeout(() => detalhesRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 60)
+    }
+  }, [expandido])
 
   const corPagamento = {
     'Pix': 'bg-blue-900 text-blue-300',
@@ -244,12 +271,12 @@ function CardPedido({ pedido, onImprimir, selecionado, onToggleSelecionado, info
     : 'bg-teal-900/50 text-teal-300'
 
   return (
-    <div className={`bg-scooby-card border rounded-2xl overflow-hidden transition ${selecionado ? 'border-scooby-amarelo' : 'border-scooby-borda'}`}>
+    <div className={`bg-scooby-card border rounded-xl overflow-hidden transition ${selecionado ? 'border-scooby-amarelo' : 'border-scooby-borda'}`}>
       {/* Linha principal */}
       <div className="flex items-stretch">
         {/* Checkbox */}
         <div
-          className="flex items-center px-4 cursor-pointer hover:bg-scooby-borda/20 transition"
+          className="flex items-center px-3 cursor-pointer hover:bg-scooby-borda/20 transition"
           onClick={e => { e.stopPropagation(); onToggleSelecionado(id) }}
         >
           <input
@@ -264,55 +291,62 @@ function CardPedido({ pedido, onImprimir, selecionado, onToggleSelecionado, info
         {/* Botão expandir */}
         <button
           onClick={() => setExpandido(e => !e)}
-          className="flex-1 text-left py-4 pr-4 flex items-center gap-4 hover:bg-scooby-borda/30 transition"
+          className="flex-1 text-left py-3 pr-3 flex items-center gap-3 hover:bg-scooby-borda/30 transition min-w-0"
         >
-          {/* Número e hora */}
-          <div className="flex-shrink-0 text-center w-14">
-            <p className="text-scooby-amarelo font-bold text-sm">{pedido.hora}</p>
-            <p className="text-gray-600 text-xs">{pedido.numeroPedido?.split('-').pop() || '—'}</p>
+          {/* Hora + número */}
+          <div className="flex-shrink-0 text-center w-12">
+            <p className="text-scooby-amarelo font-bold text-xs leading-tight">{pedido.hora}</p>
+            <p className="text-gray-600 text-xs">#{pedido.numeroPedido?.split('-').pop() || '—'}</p>
           </div>
 
-          <div className="w-px h-10 bg-scooby-borda flex-shrink-0" />
+          <div className="w-px h-8 bg-scooby-borda flex-shrink-0" />
 
-          {/* Cliente */}
+          {/* Cliente + itens */}
           <div className="flex-1 min-w-0">
             <p className="text-white font-semibold text-sm truncate">{pedido.nomeCliente}</p>
-            <p className="text-gray-500 text-xs truncate">{pedido.endereco}</p>
+            <p className="text-gray-400 text-xs truncate">{pedido.itensPedido.replace(/ \| /g, ' · ')}</p>
           </div>
 
-          {/* Itens resumidos */}
-          <div className="hidden md:block flex-1 min-w-0">
-            <p className="text-gray-300 text-xs truncate">{pedido.itensPedido}</p>
-          </div>
-
-          {/* Total + badges + status impressão */}
+          {/* Total + badges */}
           <div className="flex-shrink-0 text-right">
-            <p className="text-scooby-amarelo font-bold">R$ {pedido.total}</p>
-            <div className="flex gap-1 mt-1 justify-end flex-wrap">
-              <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${corPagamento}`}>
-                {pedido.pagamento === 'Cartão de Débito' ? 'Débito' : pedido.pagamento === 'Cartão de Crédito' ? 'Crédito' : pedido.pagamento}
+            <p className="text-scooby-amarelo font-bold text-sm">R$ {pedido.total}</p>
+            <div className="flex gap-1 mt-0.5 justify-end">
+              <span className={`text-xs px-1.5 py-0.5 rounded-full font-semibold ${corPagamento}`}>
+                {pedido.pagamento === 'Cartão de Débito' ? 'Déb' : pedido.pagamento === 'Cartão de Crédito' ? 'Créd' : pedido.pagamento}
               </span>
-              <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${corTipo}`}>
-                {pedido.tipoEntrega}
+              <span className={`text-xs px-1.5 py-0.5 rounded-full font-semibold ${corTipo}`}>
+                {pedido.tipoEntrega === 'Entrega' ? '🛵' : '🏠'}
               </span>
             </div>
-            {/* Status de impressão */}
-            {infoImpressao ? (
-              <p className="text-xs text-green-400 mt-1 font-medium">
-                🖨️ {infoImpressao.tipo === 'auto' ? 'Auto' : 'Manual'} · {infoImpressao.hora}
-              </p>
-            ) : (
-              <p className="text-xs text-gray-600 mt-1">Não impresso</p>
-            )}
+            {infoImpressao
+              ? <p className="text-xs text-green-500 mt-0.5">🖨️ {infoImpressao.hora}</p>
+              : <p className="text-xs text-gray-700 mt-0.5">não impresso</p>
+            }
           </div>
 
-          <span className="text-gray-500 text-sm flex-shrink-0">{expandido ? '▲' : '▼'}</span>
+          <span className="text-gray-500 text-xs flex-shrink-0 ml-1">{expandido ? '▲' : '▼'}</span>
         </button>
+
+        {/* Botão WhatsApp */}
+        {waLink && (
+          <a
+            href={waLink}
+            target="_blank"
+            rel="noreferrer"
+            onClick={e => e.stopPropagation()}
+            title={`Contatar ${pedido.nomeCliente} via WhatsApp`}
+            className="flex items-center justify-center px-3 text-green-400 hover:text-green-300 hover:bg-green-900/20 transition border-l border-scooby-borda flex-shrink-0"
+          >
+            <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
+              <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+            </svg>
+          </a>
+        )}
       </div>
 
       {/* Detalhes expandidos */}
       {expandido && (
-        <div className="border-t border-scooby-borda bg-scooby-escuro px-5 py-4 space-y-3">
+        <div ref={detalhesRef} className="border-t border-scooby-borda bg-scooby-escuro px-4 py-3 space-y-3">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <p className="text-gray-500 text-xs uppercase tracking-wide mb-1">Itens do pedido</p>
@@ -325,14 +359,21 @@ function CardPedido({ pedido, onImprimir, selecionado, onToggleSelecionado, info
             <div className="space-y-2">
               <div>
                 <p className="text-gray-500 text-xs uppercase tracking-wide">Cliente</p>
-                <p className="text-white text-sm">{pedido.nomeCliente}</p>
+                <div className="flex items-center gap-2">
+                  <p className="text-white text-sm">{pedido.nomeCliente}</p>
+                  {waLink && (
+                    <a href={waLink} target="_blank" rel="noreferrer" className="text-green-400 text-xs hover:underline">
+                      📱 {pedido.telefone}
+                    </a>
+                  )}
+                </div>
               </div>
-              <div>
-                <p className="text-gray-500 text-xs uppercase tracking-wide">
-                  {pedido.tipoEntrega === 'Entrega' ? 'Endereço' : 'Tipo'}
-                </p>
-                <p className="text-white text-sm">{pedido.endereco}</p>
-              </div>
+              {pedido.tipoEntrega === 'Entrega' && pedido.endereco && (
+                <div>
+                  <p className="text-gray-500 text-xs uppercase tracking-wide">Endereço</p>
+                  <p className="text-white text-sm">{pedido.endereco}</p>
+                </div>
+              )}
               <div>
                 <p className="text-gray-500 text-xs uppercase tracking-wide">Pagamento</p>
                 <p className="text-white text-sm">{pedido.pagamento}</p>
@@ -346,20 +387,30 @@ function CardPedido({ pedido, onImprimir, selecionado, onToggleSelecionado, info
             </div>
           </div>
 
-          <div className="border-t border-scooby-borda pt-3 flex flex-wrap items-center gap-4 text-sm">
+          <div className="border-t border-scooby-borda pt-3 flex flex-wrap items-center gap-3 text-sm">
             <span className="text-gray-400">Subtotal: <span className="text-white">R$ {pedido.subtotal}</span></span>
-            <span className="text-gray-400">Entrega: <span className="text-white">R$ {pedido.taxaEntrega}</span></span>
+            {pedido.tipoEntrega === 'Entrega' && <span className="text-gray-400">Entrega: <span className="text-white">R$ {pedido.taxaEntrega}</span></span>}
             <span className="text-gray-400">Total: <span className="text-scooby-amarelo font-bold">R$ {pedido.total}</span></span>
-            <button
-              onClick={() => onImprimir(pedido, 'manual')}
-              className={`ml-auto flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg transition ${
-                infoImpressao
-                  ? 'bg-blue-900 hover:bg-blue-800 text-blue-200'
-                  : 'bg-gray-700 hover:bg-gray-600 text-white'
-              }`}
-            >
-              🖨️ {infoImpressao ? 'Reimprimir' : 'Imprimir'}
-            </button>
+            <div className="ml-auto flex gap-2">
+              {waLink && (
+                <a
+                  href={waLink}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg bg-green-900/50 hover:bg-green-800/50 text-green-300 transition"
+                >
+                  💬 Contatar cliente
+                </a>
+              )}
+              <button
+                onClick={() => onImprimir(pedido, 'manual')}
+                className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg transition ${
+                  infoImpressao ? 'bg-blue-900 hover:bg-blue-800 text-blue-200' : 'bg-gray-700 hover:bg-gray-600 text-white'
+                }`}
+              >
+                🖨️ {infoImpressao ? 'Reimprimir' : 'Imprimir'}
+              </button>
+            </div>
           </div>
         </div>
       )}
