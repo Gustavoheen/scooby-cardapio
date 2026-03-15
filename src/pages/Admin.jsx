@@ -28,14 +28,14 @@ function filtrarPedidos(pedidos, dataFiltro, pagamentoFiltro) {
 
 function gerarCupom(pedido, alturaMm) {
   const itens = pedido.itensPedido.split(' | ').map(i => `<div class="item">• ${i}</div>`).join('')
-  const pageSize = alturaMm ? `58mm ${alturaMm}mm` : '58mm auto'
+  const pageSize = alturaMm ? `76mm ${alturaMm}mm` : '76mm auto'
   return `<!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>Pedido</title>
 <style>
   @page { size: ${pageSize} !important; margin: 0 !important; }
-  html { margin: 0; padding: 0; width: 58mm; height: auto; overflow: hidden; }
+  html { margin: 0; padding: 0; width: 76mm; height: auto; overflow: hidden; }
   * { box-sizing: border-box; }
-  body { font-family: 'Courier New', monospace; font-size: 11px; width: 56mm; margin: 1mm; padding: 0; color: #000; height: auto; overflow: hidden; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body { font-family: 'Courier New', monospace; font-size: 12px; width: 72mm; margin: 2mm; padding: 0; color: #000; height: auto; overflow: hidden; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   * { color: #000 !important; -webkit-font-smoothing: none; font-weight: 500; }
   .center { text-align: center; }
   .bold { font-weight: 900; }
@@ -76,7 +76,8 @@ function gerarCupom(pedido, alturaMm) {
 
 function imprimirPedido(pedido) {
   // Passo 1: renderiza invisível para medir a altura real do conteúdo
-  const medidor = window.open('', '_blank', 'width=220,height=100,left=-9999,top=-9999')
+  // 76mm a 96dpi = 76 * 96 / 25.4 ≈ 287px
+  const medidor = window.open('', '_blank', 'width=287,height=100,left=-9999,top=-9999')
   if (!medidor) { alert('Permita pop-ups para imprimir.'); return }
   medidor.document.write(gerarCupom(pedido))
   medidor.document.close()
@@ -88,7 +89,7 @@ function imprimirPedido(pedido) {
     medidor.close()
 
     // Passo 2: abre janela de impressão com @page já no tamanho exato
-    const w = window.open('', '_blank', `width=220,height=${alturaPixels + 40},left=0,top=0`)
+    const w = window.open('', '_blank', `width=287,height=${alturaPixels + 40},left=0,top=0`)
     if (!w) { alert('Permita pop-ups para imprimir.'); return }
     w.document.write(gerarCupom(pedido, alturaMm))
     w.document.close()
@@ -1724,7 +1725,7 @@ export default function Admin() {
                   <li>O Chrome lembrará da última impressora usada. A partir daí, toda impressão irá direto para a <span className="text-white font-semibold">{nomeImpressora || 'PSO58'}</span> automaticamente.</li>
                 </ol>
                 <div className="bg-yellow-900/30 border border-yellow-700/40 rounded-lg px-3 py-2 text-yellow-300 text-xs mt-2">
-                  💡 O papel da PSO58 tem 58mm de largura. O cupom já está formatado no tamanho certo — nenhum ajuste adicional é necessário.
+                  💡 O papel tem 76mm de largura. No driver da impressora, configure o tamanho do papel como <strong>76mm × variável</strong> (ou "Roll Paper 76mm"). Isso evita que a impressora avance papel em excesso.
                 </div>
               </div>
             )}
