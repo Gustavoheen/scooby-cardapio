@@ -34,10 +34,11 @@ function gerarCupom(pedido) {
   @page { size: 58mm auto; margin: 0; }
   html, body { margin: 0; padding: 0; height: auto; }
   * { box-sizing: border-box; }
-  body { font-family: 'Courier New', monospace; font-size: 11px; width: 56mm; padding: 2mm 1mm; color: #000; display: inline-block; }
+  body { font-family: 'Courier New', monospace; font-size: 11px; width: 56mm; padding: 2mm 1mm; color: #000; display: inline-block; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  * { color: #000 !important; -webkit-font-smoothing: none; font-weight: 500; }
   .center { text-align: center; }
-  .bold { font-weight: bold; }
-  .big { font-size: 13px; }
+  .bold { font-weight: 900; }
+  .big { font-size: 13px; font-weight: 900; }
   .line { border-top: 1px dashed #000; margin: 3px 0; }
   .row { display: flex; justify-content: space-between; margin: 1px 0; }
   .item { margin: 1px 0; font-size: 10.5px; }
