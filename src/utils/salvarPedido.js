@@ -1,14 +1,5 @@
 import { CONFIG } from '../config'
 
-function gerarNumeroPedido() {
-  const hoje = new Date().toLocaleDateString('pt-BR')
-  const chave = `scooby_pedido_${hoje}`
-  const ultimo = parseInt(localStorage.getItem(chave) || '0')
-  const novo = ultimo + 1
-  localStorage.setItem(chave, String(novo))
-  return `${hoje.replace(/\//g, '')}-${String(novo).padStart(3, '0')}`
-}
-
 export async function salvarPedido(dados, itens, subtotal, taxaEntregaDinamica = CONFIG.taxaEntrega, desconto = 0, cupomAplicado = null) {
   const taxa = dados.tipoEntrega === 'entrega' ? taxaEntregaDinamica : 0
   const total = subtotal + taxa - desconto
@@ -19,7 +10,6 @@ export async function salvarPedido(dados, itens, subtotal, taxaEntregaDinamica =
 
   const agora = new Date()
   const payload = {
-    numeroPedido: gerarNumeroPedido(),
     data:         agora.toLocaleDateString('pt-BR'),
     hora:         agora.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
     nomeCliente:  dados.nome,
@@ -39,12 +29,15 @@ export async function salvarPedido(dados, itens, subtotal, taxaEntregaDinamica =
   }
 
   try {
-    await fetch('/api/pedido', {
+    const resp = await fetch('/api/pedido', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     })
+    const result = await resp.json()
+    return result.numeroPedido || null
   } catch (err) {
     console.warn('Falha ao salvar pedido:', err)
+    return null
   }
 }

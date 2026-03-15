@@ -99,9 +99,7 @@ function TelaPix({ total, onConfirmar }) {
   )
 }
 
-// ── Storage helpers ──────────────────────────────────────────────
-
-const STORAGE_KEY = 'scooby_clientes'
+// ── Helpers ───────────────────────────────────────────────────────
 
 function normalizarTelefone(tel) {
   return tel.replace(/\D/g, '')
@@ -124,68 +122,43 @@ function enderecoIgual(a, b) {
   )
 }
 
-function carregarTodosClientes() {
-  try {
-    const salvo = localStorage.getItem(STORAGE_KEY)
-    if (salvo) return JSON.parse(salvo)
-    // migração do formato antigo
-    const antigo = localStorage.getItem('scooby_cliente')
-    if (antigo) {
-      const d = JSON.parse(antigo)
-      if (d.telefone) {
-        const endereco = { rua: d.rua || '', numero: d.numero || '', complemento: d.complemento || '', bairro: d.bairro || '' }
-        const mapa = {
-          [normalizarTelefone(d.telefone)]: {
-            nome: d.nome, telefone: d.telefone, pagamento: d.pagamento, tipoEntrega: d.tipoEntrega,
-            enderecos: endereco.rua ? [endereco] : [],
-          }
-        }
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(mapa))
-        localStorage.removeItem('scooby_cliente')
-        return mapa
-      }
-    }
-    return {}
-  } catch {
-    return {}
-  }
-}
-
-function buscarClientePorTelefone(tel) {
+async function buscarClienteAPI(tel) {
   const chave = normalizarTelefone(tel)
-  if (chave.length < 8) return null
-  const todos = carregarTodosClientes()
-  const cliente = todos[chave]
-  if (!cliente) return null
-  // migração: cliente no formato antigo (sem enderecos[])
-  if (!cliente.enderecos) {
-    const end = { rua: cliente.rua || '', numero: cliente.numero || '', complemento: cliente.complemento || '', bairro: cliente.bairro || '' }
-    cliente.enderecos = end.rua ? [end] : []
+  if (chave.length < 10) return null
+  try {
+    const resp = await fetch(`/api/clientes?telefone=${chave}`)
+    if (!resp.ok) return null
+    return await resp.json()
+  } catch {
+    return null
   }
-  return cliente
 }
 
-function salvarDadosCliente(dados) {
+async function salvarClienteAPI(dados, enderecoAnterior) {
+  const chave = normalizarTelefone(dados.telefone)
+  if (!chave) return
   try {
-    const chave = normalizarTelefone(dados.telefone)
-    if (!chave) return
-    const todos = carregarTodosClientes()
-    const existente = todos[chave] || { enderecos: [] }
-    if (!existente.enderecos) existente.enderecos = []
-
+    // Busca endereços existentes para não sobrescrever
+    const existente = await buscarClienteAPI(dados.telefone)
+    const enderecosSalvos = existente?.enderecos || []
     const novoEndereco = { rua: dados.rua || '', numero: dados.numero || '', complemento: dados.complemento || '', bairro: dados.bairro || '' }
-    const jaExiste = novoEndereco.rua && existente.enderecos.some(e => enderecoIgual(e, novoEndereco))
-    const enderecos = jaExiste ? existente.enderecos : (novoEndereco.rua ? [...existente.enderecos, novoEndereco] : existente.enderecos)
+    const jaExiste = novoEndereco.rua && enderecosSalvos.some(e => enderecoIgual(e, novoEndereco))
+    const enderecos = jaExiste ? enderecosSalvos : (novoEndereco.rua ? [...enderecosSalvos, novoEndereco] : enderecosSalvos)
 
-    todos[chave] = {
-      nome: dados.nome,
-      telefone: dados.telefone,
-      pagamento: dados.pagamento,
-      tipoEntrega: dados.tipoEntrega,
-      enderecos,
-    }
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(todos))
-  } catch {}
+    await fetch('/api/clientes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        telefone: chave,
+        nome: dados.nome,
+        pagamento: dados.pagamento,
+        tipoEntrega: dados.tipoEntrega,
+        enderecos,
+      }),
+    })
+  } catch (err) {
+    console.warn('Falha ao salvar cliente:', err)
+  }
 }
 
 // ── Componente principal ──────────────────────────────────────────
@@ -236,25 +209,31 @@ export function ModalPedido({ itens, subtotal, onFechar, onConcluir, taxaEntrega
 
   function handleTelefoneChange(tel) {
     setDados(d => ({ ...d, telefone: tel }))
-    const cliente = buscarClientePorTelefone(tel)
-    if (cliente) {
-      setClienteRecuperado(cliente.nome)
-      setEnderecosSalvos(cliente.enderecos || [])
-      // preenche nome, pagamento, tipoEntrega
-      setDados(d => ({
-        ...d,
-        telefone: tel,
-        nome: cliente.nome || d.nome,
-        pagamento: cliente.pagamento || d.pagamento,
-        tipoEntrega: cliente.tipoEntrega || d.tipoEntrega,
-        ...ENDERECO_VAZIO,
-      }))
-      // auto-seleciona se só tiver 1 endereço
-      if (cliente.enderecos?.length === 1) {
-        selecionarEndereco(0, cliente.enderecos)
-      } else {
-        setEnderecoSelecionado(null)
-      }
+    const chave = normalizarTelefone(tel)
+    if (chave.length >= 10) {
+      buscarClienteAPI(tel).then(cliente => {
+        if (cliente) {
+          setClienteRecuperado(cliente.nome)
+          setEnderecosSalvos(cliente.enderecos || [])
+          setDados(d => ({
+            ...d,
+            telefone: tel,
+            nome: cliente.nome || d.nome,
+            pagamento: cliente.pagamento || d.pagamento,
+            tipoEntrega: cliente.tipoEntrega || d.tipoEntrega,
+            ...ENDERECO_VAZIO,
+          }))
+          if (cliente.enderecos?.length === 1) {
+            selecionarEndereco(0, cliente.enderecos)
+          } else {
+            setEnderecoSelecionado(null)
+          }
+        } else {
+          setClienteRecuperado(null)
+          setEnderecosSalvos([])
+          setEnderecoSelecionado(null)
+        }
+      })
     } else {
       setClienteRecuperado(null)
       setEnderecosSalvos([])
@@ -295,7 +274,6 @@ export function ModalPedido({ itens, subtotal, onFechar, onConcluir, taxaEntrega
     const e = validar()
     if (Object.keys(e).length > 0) { setErros(e); return }
     setErros({})
-    salvarDadosCliente(dados)
     if (dados.pagamento === 'Pix') {
       setEtapa('pix')
     } else {
@@ -307,6 +285,7 @@ export function ModalPedido({ itens, subtotal, onFechar, onConcluir, taxaEntrega
     const msg = formatarMensagemWhatsApp(dados, itens, subtotal, taxaEntrega, desconto, cupomAplicado, tempoEntrega)
     window.location.href = `whatsapp://send?phone=${CONFIG.whatsappNumero}&text=${msg}`
     salvarPedido(dados, itens, subtotal, taxaEntrega, desconto, cupomAplicado)
+    salvarClienteAPI(dados)
     onConcluir()
   }
 

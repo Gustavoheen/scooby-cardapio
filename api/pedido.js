@@ -29,11 +29,21 @@ module.exports = async function handler(req, res) {
 
     if (req.method === 'POST') {
       const id = Date.now()
+
+      // Gera número sequencial do dia consultando o banco
+      const hoje = new Date().toLocaleDateString('pt-BR')
+      const { count } = await supabase
+        .from('orders')
+        .select('*', { count: 'exact', head: true })
+        .filter('data->>data', 'eq', hoje)
+      const numeroPedido = `${hoje.replace(/\//g, '')}-${String((count || 0) + 1).padStart(3, '0')}`
+
+      const payload = { ...req.body, numeroPedido }
       const { error } = await supabase
         .from('orders')
-        .insert({ id, data: req.body })
+        .insert({ id, data: payload })
       if (error) throw error
-      return res.status(200).json({ sucesso: true })
+      return res.status(200).json({ sucesso: true, numeroPedido })
     }
   } catch (err) {
     return res.status(500).json({ erro: err.message })
