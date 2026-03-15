@@ -269,6 +269,14 @@ export default function Admin() {
   const [msgSenha, setMsgSenha] = useState('')
   const [salvandoSenha, setSalvandoSenha] = useState(false)
 
+  // ── Estado da aba Configurações ────────────────────────────
+  const [whatsappEditado, setWhatsappEditado] = useState(CONFIG.whatsappNumero)
+  const [pixChaveEditada, setPixChaveEditada] = useState(CONFIG.pixChave)
+  const [pixTipoEditado, setPixTipoEditado] = useState(CONFIG.pixTipo)
+  const [pixNomeEditado, setPixNomeEditado] = useState(CONFIG.pixNome)
+  const [salvandoConfig, setSalvandoConfig] = useState(false)
+  const [msgConfig, setMsgConfig] = useState('')
+
   function buildPayload(extras = {}) {
     const precosFinal = {}
     Object.entries(precosEditados).forEach(([id, val]) => {
@@ -357,6 +365,10 @@ export default function Admin() {
         setTempoEntregaEditado(estado.tempoEntrega ?? CONFIG.tempoEntrega)
         setPromocoesEditadas(estado.promocoes || [])
         setCuponsEditados(estado.cupons || [])
+        setWhatsappEditado(estado.whatsappNumero || CONFIG.whatsappNumero)
+        setPixChaveEditada(estado.pixChave || CONFIG.pixChave)
+        setPixTipoEditado(estado.pixTipo || CONFIG.pixTipo)
+        setPixNomeEditado(estado.pixNome || CONFIG.pixNome)
         setLojaStatus(estado.lojaStatus || 'auto')
         setHorarioAberturaEditado(estado.horarioAbertura || CONFIG.horarioAbertura)
         setHorarioFechamentoEditado(estado.horarioFechamento || CONFIG.horarioFechamento)
@@ -447,6 +459,29 @@ export default function Admin() {
       setAutenticado(true)
     } else {
       alert('Senha incorreta!')
+    }
+  }
+
+  async function salvarConfiguracoes() {
+    setSalvandoConfig(true)
+    setMsgConfig('')
+    try {
+      await fetch('/api/cardapio-state', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(buildPayload({
+          whatsappNumero: whatsappEditado.trim(),
+          pixChave: pixChaveEditada.trim(),
+          pixTipo: pixTipoEditado.trim(),
+          pixNome: pixNomeEditado.trim(),
+        })),
+      })
+      setMsgConfig('✅ Configurações salvas com sucesso!')
+    } catch {
+      setMsgConfig('❌ Erro ao salvar. Tente novamente.')
+    } finally {
+      setSalvandoConfig(false)
+      setTimeout(() => setMsgConfig(''), 3000)
     }
   }
 
@@ -758,6 +793,7 @@ export default function Admin() {
             { id: 'pedidos', label: '📋 Pedidos' },
             { id: 'clientes', label: '👥 Clientes' },
             { id: 'cardapio', label: '🍔 Cardápio' },
+            { id: 'configuracoes', label: '⚙️ Configurações' },
             { id: 'seguranca', label: '🔐 Segurança' },
           ].map(aba => (
             <button
@@ -1475,6 +1511,161 @@ export default function Admin() {
       )}
 
       {/* ── ABA SEGURANÇA ── */}
+      {/* ── ABA CONFIGURAÇÕES ── */}
+      {abaAtiva === 'configuracoes' && (
+        <div className="max-w-xl mx-auto px-4 py-6 space-y-6">
+
+          {/* WhatsApp */}
+          <div className="bg-scooby-card border border-scooby-borda rounded-2xl p-5 space-y-4">
+            <div className="flex items-center gap-3 mb-1">
+              <span className="text-2xl">📱</span>
+              <div>
+                <h3 className="text-scooby-amarelo font-bold text-base">WhatsApp para pedidos</h3>
+                <p className="text-gray-500 text-xs">Número que recebe os pedidos (com DDI+DDD)</p>
+              </div>
+            </div>
+            <div>
+              <label className="text-gray-300 text-sm font-medium block mb-1">Número do WhatsApp</label>
+              <input
+                type="tel"
+                placeholder="5532999301657"
+                value={whatsappEditado}
+                onChange={e => setWhatsappEditado(e.target.value.replace(/\D/g, ''))}
+                className="w-full bg-scooby-escuro border border-scooby-borda text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-scooby-amarelo font-mono"
+              />
+              <p className="text-gray-500 text-xs mt-1">Somente números. Ex: 5532999301657</p>
+            </div>
+          </div>
+
+          {/* Pix */}
+          <div className="bg-scooby-card border border-scooby-borda rounded-2xl p-5 space-y-4">
+            <div className="flex items-center gap-3 mb-1">
+              <span className="text-2xl">💠</span>
+              <div>
+                <h3 className="text-scooby-amarelo font-bold text-base">Dados do Pix</h3>
+                <p className="text-gray-500 text-xs">Exibidos para o cliente ao pagar via Pix</p>
+              </div>
+            </div>
+            <div>
+              <label className="text-gray-300 text-sm font-medium block mb-1">Chave Pix</label>
+              <input
+                type="text"
+                placeholder="CPF, CNPJ, e-mail, telefone ou chave aleatória"
+                value={pixChaveEditada}
+                onChange={e => setPixChaveEditada(e.target.value)}
+                className="w-full bg-scooby-escuro border border-scooby-borda text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-scooby-amarelo"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-gray-300 text-sm font-medium block mb-1">Tipo da chave</label>
+                <select
+                  value={pixTipoEditado}
+                  onChange={e => setPixTipoEditado(e.target.value)}
+                  className="w-full bg-scooby-escuro border border-scooby-borda text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-scooby-amarelo"
+                >
+                  <option>Telefone</option>
+                  <option>CPF</option>
+                  <option>CNPJ</option>
+                  <option>E-mail</option>
+                  <option>Chave aleatória</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-gray-300 text-sm font-medium block mb-1">Nome do favorecido</label>
+                <input
+                  type="text"
+                  placeholder="Nome no Pix"
+                  value={pixNomeEditado}
+                  onChange={e => setPixNomeEditado(e.target.value)}
+                  className="w-full bg-scooby-escuro border border-scooby-borda text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-scooby-amarelo"
+                />
+              </div>
+            </div>
+
+            {/* Prévia */}
+            {pixChaveEditada && (
+              <div className="bg-scooby-escuro rounded-xl p-4">
+                <p className="text-gray-500 text-xs mb-2">Prévia — como o cliente verá:</p>
+                <p className="text-white font-mono text-sm">{pixChaveEditada}</p>
+                <p className="text-gray-400 text-xs mt-0.5">{pixNomeEditado} · {pixTipoEditado}</p>
+              </div>
+            )}
+          </div>
+
+          {/* Horário + Entrega */}
+          <div className="bg-scooby-card border border-scooby-borda rounded-2xl p-5 space-y-4">
+            <div className="flex items-center gap-3 mb-1">
+              <span className="text-2xl">🕐</span>
+              <div>
+                <h3 className="text-scooby-amarelo font-bold text-base">Horário e entrega</h3>
+                <p className="text-gray-500 text-xs">Esses valores aparecem para o cliente no site</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-gray-300 text-sm font-medium block mb-1">Abertura</label>
+                <input
+                  type="time"
+                  value={horarioAberturaEditado}
+                  onChange={e => setHorarioAberturaEditado(e.target.value)}
+                  className="w-full bg-scooby-escuro border border-scooby-borda text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-scooby-amarelo"
+                />
+              </div>
+              <div>
+                <label className="text-gray-300 text-sm font-medium block mb-1">Fechamento</label>
+                <input
+                  type="time"
+                  value={horarioFechamentoEditado}
+                  onChange={e => setHorarioFechamentoEditado(e.target.value)}
+                  className="w-full bg-scooby-escuro border border-scooby-borda text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-scooby-amarelo"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-gray-300 text-sm font-medium block mb-1">Taxa de entrega (R$)</label>
+                <input
+                  type="number"
+                  value={taxaEntregaEditada}
+                  onChange={e => setTaxaEntregaEditada(e.target.value)}
+                  className="w-full bg-scooby-escuro border border-scooby-borda text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-scooby-amarelo"
+                  step="0.50" min="0"
+                />
+              </div>
+              <div>
+                <label className="text-gray-300 text-sm font-medium block mb-1">Tempo de entrega</label>
+                <input
+                  type="text"
+                  placeholder="Ex: 40 a 60 min"
+                  value={tempoEntregaEditado}
+                  onChange={e => setTempoEntregaEditado(e.target.value)}
+                  className="w-full bg-scooby-escuro border border-scooby-borda text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-scooby-amarelo"
+                />
+              </div>
+            </div>
+          </div>
+
+          {msgConfig && (
+            <p className={`text-sm font-semibold px-4 py-3 rounded-xl ${msgConfig.includes('✅') ? 'bg-green-900 text-green-300' : 'bg-red-900 text-red-300'}`}>
+              {msgConfig}
+            </p>
+          )}
+
+          <button
+            onClick={salvarConfiguracoes}
+            disabled={salvandoConfig}
+            className="w-full bg-scooby-amarelo hover:bg-yellow-400 disabled:opacity-50 text-black font-bold py-3 rounded-xl transition"
+          >
+            {salvandoConfig ? 'Salvando...' : '💾 Salvar configurações'}
+          </button>
+
+          <div className="bg-blue-900/30 border border-blue-700/40 rounded-xl px-4 py-3 text-blue-300 text-xs">
+            ℹ️ As configurações de WhatsApp e Pix são salvas no banco de dados e entram em vigor imediatamente no site.
+          </div>
+        </div>
+      )}
+
       {abaAtiva === 'seguranca' && (
         <div className="max-w-lg mx-auto px-4 py-6 space-y-6">
 

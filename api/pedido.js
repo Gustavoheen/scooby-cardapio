@@ -1,18 +1,10 @@
-const { put, list } = require('@vercel/blob')
+const { createClient } = require('@supabase/supabase-js')
 
-const KEY = 'pedidos.json'
-
-async function lerPedidos() {
-  try {
-    const { blobs } = await list({ prefix: KEY })
-    if (!blobs.length) return []
-    const res = await fetch(blobs[0].url + '?t=' + Date.now(), {
-      headers: { Authorization: `Bearer ${process.env.BLOB_READ_WRITE_TOKEN}` },
-    })
-    return await res.json()
-  } catch {
-    return []
-  }
+function getSupabase() {
+  return createClient(
+    process.env.SUPABASE_URL,
+    process.env.SUPABASE_SERVICE_KEY
+  )
 }
 
 module.exports = async function handler(req, res) {
@@ -22,21 +14,25 @@ module.exports = async function handler(req, res) {
 
   if (req.method === 'OPTIONS') return res.status(200).end()
 
+  const supabase = getSupabase()
+
   try {
     if (req.method === 'GET') {
-      const pedidos = await lerPedidos()
+      const { data, error } = await supabase
+        .from('orders')
+        .select('id, data, criadoEm')
+        .order('id', { ascending: false })
+      if (error) throw error
+      const pedidos = (data || []).map(r => ({ ...r.data, id: r.id, criadoEm: r.criadoEm }))
       return res.status(200).json(pedidos)
     }
 
     if (req.method === 'POST') {
-      const pedidos = await lerPedidos()
-      const novo = { ...req.body, id: Date.now() }
-      pedidos.push(novo)
-      await put(KEY, JSON.stringify(pedidos), {
-        access: 'private',
-        contentType: 'application/json',
-        allowOverwrite: true,
-      })
+      const id = Date.now()
+      const { error } = await supabase
+        .from('orders')
+        .insert({ id, data: req.body })
+      if (error) throw error
       return res.status(200).json({ sucesso: true })
     }
   } catch (err) {
