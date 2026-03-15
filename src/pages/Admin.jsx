@@ -31,29 +31,29 @@ function gerarCupom(pedido) {
   return `<!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>Pedido</title>
 <style>
+  @page { size: 58mm auto; margin: 2mm 1mm; }
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: 'Courier New', monospace; font-size: 12px; width: 280px; padding: 6px 8px; color: #000; }
+  body { font-family: 'Courier New', monospace; font-size: 11px; width: 54mm; color: #000; }
   .center { text-align: center; }
   .bold { font-weight: bold; }
-  .big { font-size: 15px; }
-  .line { border-top: 1px dashed #000; margin: 6px 0; }
-  .row { display: flex; justify-content: space-between; margin: 2px 0; }
-  .item { margin: 2px 0; }
-  .total-row { display: flex; justify-content: space-between; font-weight: bold; font-size: 14px; margin: 3px 0; }
-  @media print { body { margin: 0; } }
+  .big { font-size: 13px; }
+  .line { border-top: 1px dashed #000; margin: 4px 0; }
+  .row { display: flex; justify-content: space-between; margin: 1px 0; }
+  .item { margin: 1px 0; }
+  .total-row { display: flex; justify-content: space-between; font-weight: bold; font-size: 13px; margin: 2px 0; }
 </style></head>
 <body>
   <div class="center bold big">SCOOBY-DOO LANCHES</div>
-  <div class="center" style="font-size:10px">Hamburguer Artesanal</div>
+  <div class="center" style="font-size:9px">Hamburguer Artesanal</div>
   <div class="line"></div>
   <div class="row"><span>Pedido:</span><span class="bold">${pedido.numeroPedido || pedido.id || '—'}</span></div>
-  <div class="row"><span>Data:</span><span>${pedido.data} às ${pedido.hora}</span></div>
+  <div class="row"><span>Data:</span><span>${pedido.data} ${pedido.hora}</span></div>
   <div class="line"></div>
-  <div class="bold" style="margin-bottom:4px">ITENS:</div>
+  <div class="bold" style="margin-bottom:3px">ITENS:</div>
   ${itens}
   <div class="line"></div>
   <div class="row"><span>Subtotal:</span><span>R$ ${pedido.subtotal}</span></div>
-  <div class="row"><span>Taxa entrega:</span><span>R$ ${pedido.taxaEntrega}</span></div>
+  ${pedido.tipoEntrega === 'Entrega' ? `<div class="row"><span>Taxa entrega:</span><span>R$ ${pedido.taxaEntrega}</span></div>` : ''}
   ${pedido.desconto && parseFloat(pedido.desconto) > 0 ? `<div class="row"><span>Desconto:</span><span>- R$ ${pedido.desconto}</span></div>` : ''}
   <div class="line"></div>
   <div class="total-row"><span>TOTAL:</span><span>R$ ${pedido.total}</span></div>
@@ -67,12 +67,12 @@ function gerarCupom(pedido) {
   ${pedido.tipoEntrega === 'Entrega' && pedido.endereco ? `<div style="margin-top:2px">End: ${pedido.endereco}</div>` : ''}
   ${pedido.observacao ? `<div class="line"></div><div class="bold">OBS:</div><div>${pedido.observacao}</div>` : ''}
   <div class="line"></div>
-  <div class="center" style="font-size:10px;margin-top:4px">Obrigado pela preferência!</div>
+  <div class="center" style="font-size:9px;margin-top:3px">Obrigado pela preferência!</div>
 </body></html>`
 }
 
 function imprimirPedido(pedido) {
-  const w = window.open('', '_blank', 'width=340,height=700,left=0,top=0')
+  const w = window.open('', '_blank', 'width=320,height=600,left=0,top=0')
   if (!w) { alert('Permita pop-ups para imprimir.'); return }
   w.document.write(gerarCupom(pedido))
   w.document.close()
@@ -80,7 +80,7 @@ function imprimirPedido(pedido) {
   setTimeout(() => {
     w.print()
     w.onafterprint = () => w.close()
-  }, 250)
+  }, 300)
 }
 
 function CardStat({ label, valor, sub, cor }) {
@@ -529,6 +529,17 @@ export default function Admin() {
 
   const [deploying, setDeploying] = useState(false)
   const [msgDeploy, setMsgDeploy] = useState('')
+
+  // ── Impressora ────────────────────────────────────────────────
+  const [nomeImpressora, setNomeImpressora] = useState(
+    localStorage.getItem('scooby_impressora') || 'PSO58'
+  )
+  const [mostrarGuiaImpressora, setMostrarGuiaImpressora] = useState(false)
+
+  function salvarNomeImpressora(nome) {
+    setNomeImpressora(nome)
+    localStorage.setItem('scooby_impressora', nome)
+  }
 
   // ── Auto-print ────────────────────────────────────────────────
   const [autoPrint, setAutoPrint] = useState(
@@ -1644,6 +1655,62 @@ export default function Admin() {
                 />
               </div>
             </div>
+          </div>
+
+          {/* Impressora */}
+          <div className="bg-scooby-card border border-scooby-borda rounded-2xl p-5 space-y-4">
+            <div className="flex items-center gap-3 mb-1">
+              <span className="text-2xl">🖨️</span>
+              <div>
+                <h3 className="text-scooby-amarelo font-bold text-base">Impressora térmica</h3>
+                <p className="text-gray-500 text-xs">Configuração para impressão de cupons (PSO58 ou similar)</p>
+              </div>
+            </div>
+
+            <div>
+              <label className="text-gray-300 text-sm font-medium block mb-1">Nome da impressora</label>
+              <input
+                type="text"
+                placeholder="Ex: PSO58, XP-58, POS-58"
+                value={nomeImpressora}
+                onChange={e => salvarNomeImpressora(e.target.value)}
+                className="w-full bg-scooby-escuro border border-scooby-borda text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-scooby-amarelo font-mono"
+              />
+              <p className="text-gray-500 text-xs mt-1">
+                Digite exatamente o nome que aparece no Windows (Painel de Controle → Dispositivos e Impressoras).
+              </p>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => handleImprimir({ numeroPedido: 'TESTE', data: new Date().toLocaleDateString('pt-BR'), hora: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }), nomeCliente: 'Cliente Teste', telefone: '(32) 99999-9999', tipoEntrega: 'Entrega', endereco: 'Rua Exemplo, 123 — Centro', itensPedido: '1x X-Burguer R$25.00 | 1x Coca-Cola R$7.00', subtotal: '32.00', taxaEntrega: '5.00', desconto: '0.00', total: '37.00', pagamento: 'Pix', observacao: '' }, 'manual')}
+                className="flex-1 bg-gray-700 hover:bg-gray-600 text-white font-semibold text-sm py-2.5 rounded-xl transition flex items-center justify-center gap-2"
+              >
+                🖨️ Imprimir cupom de teste
+              </button>
+              <button
+                onClick={() => setMostrarGuiaImpressora(g => !g)}
+                className="px-4 py-2.5 bg-blue-900/50 hover:bg-blue-800/50 border border-blue-700/50 text-blue-300 text-sm rounded-xl transition"
+              >
+                {mostrarGuiaImpressora ? 'Fechar guia' : '📖 Ver guia'}
+              </button>
+            </div>
+
+            {mostrarGuiaImpressora && (
+              <div className="bg-scooby-escuro rounded-xl p-4 space-y-3 text-sm">
+                <p className="text-scooby-amarelo font-bold">Como configurar a PSO58 para imprimir sem diálogo:</p>
+                <ol className="space-y-2 text-gray-300 list-decimal list-inside">
+                  <li>Conecte a PSO58 via USB e instale o driver (mesmo driver do iFood).</li>
+                  <li>Abra <span className="text-white font-mono bg-gray-800 px-1 rounded">Painel de Controle → Dispositivos e Impressoras</span>, clique com o botão direito na PSO58 e selecione <span className="text-white font-semibold">Definir como impressora padrão</span>.</li>
+                  <li>No Chrome, acesse <span className="text-white font-mono bg-gray-800 px-1 rounded">chrome://settings/</span> → Privacidade e segurança → Configurações do site → Configurações adicionais → PDF → marque <span className="text-white font-semibold">Fazer download de PDFs</span> como desativado.</li>
+                  <li>Clique em <span className="text-white font-semibold">🖨️ Imprimir cupom de teste</span> acima. No diálogo que abrir, selecione a <span className="text-white font-semibold">{nomeImpressora || 'PSO58'}</span> e clique em Imprimir.</li>
+                  <li>O Chrome lembrará da última impressora usada. A partir daí, toda impressão irá direto para a <span className="text-white font-semibold">{nomeImpressora || 'PSO58'}</span> automaticamente.</li>
+                </ol>
+                <div className="bg-yellow-900/30 border border-yellow-700/40 rounded-lg px-3 py-2 text-yellow-300 text-xs mt-2">
+                  💡 O papel da PSO58 tem 58mm de largura. O cupom já está formatado no tamanho certo — nenhum ajuste adicional é necessário.
+                </div>
+              </div>
+            )}
           </div>
 
           {msgConfig && (
