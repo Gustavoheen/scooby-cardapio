@@ -79,13 +79,16 @@ function imprimirPedido(pedido) {
   w.document.write(gerarCupom(pedido))
   w.document.close()
   setTimeout(() => {
-    // Redimensiona para o tamanho real do conteúdo antes de imprimir
-    const alturaConteudo = w.document.body.scrollHeight + 20
-    w.resizeTo(320, alturaConteudo)
+    // Mede altura real do conteúdo e injeta no @page para não desperdiçar papel
+    const alturaConteudo = w.document.body.scrollHeight + 8
+    const styleExato = w.document.createElement('style')
+    styleExato.textContent = `@page { size: 58mm ${alturaConteudo}px; margin: 0; }`
+    w.document.head.appendChild(styleExato)
+    w.resizeTo(320, alturaConteudo + 40)
     w.focus()
     w.print()
     w.onafterprint = () => w.close()
-  }, 300)
+  }, 350)
 }
 
 function CardStat({ label, valor, sub, cor }) {
