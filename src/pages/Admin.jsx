@@ -26,15 +26,16 @@ function filtrarPedidos(pedidos, dataFiltro, pagamentoFiltro) {
   })
 }
 
-function gerarCupom(pedido) {
+function gerarCupom(pedido, alturaMm) {
   const itens = pedido.itensPedido.split(' | ').map(i => `<div class="item">• ${i}</div>`).join('')
+  const pageSize = alturaMm ? `58mm ${alturaMm}mm` : '58mm auto'
   return `<!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>Pedido</title>
 <style>
-  @page { size: 58mm auto; margin: 0; }
-  html, body { margin: 0; padding: 0; height: auto; }
+  @page { size: ${pageSize} !important; margin: 0 !important; }
+  html { margin: 0; padding: 0; width: 58mm; height: auto; overflow: hidden; }
   * { box-sizing: border-box; }
-  body { font-family: 'Courier New', monospace; font-size: 11px; width: 56mm; padding: 2mm 1mm; color: #000; display: inline-block; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body { font-family: 'Courier New', monospace; font-size: 11px; width: 56mm; margin: 1mm; padding: 0; color: #000; height: auto; overflow: hidden; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   * { color: #000 !important; -webkit-font-smoothing: none; font-weight: 500; }
   .center { text-align: center; }
   .bold { font-weight: 900; }
@@ -74,21 +75,29 @@ function gerarCupom(pedido) {
 }
 
 function imprimirPedido(pedido) {
-  const w = window.open('', '_blank', 'width=320,height=200,left=0,top=0')
-  if (!w) { alert('Permita pop-ups para imprimir.'); return }
-  w.document.write(gerarCupom(pedido))
-  w.document.close()
+  // Passo 1: renderiza invisível para medir a altura real do conteúdo
+  const medidor = window.open('', '_blank', 'width=220,height=100,left=-9999,top=-9999')
+  if (!medidor) { alert('Permita pop-ups para imprimir.'); return }
+  medidor.document.write(gerarCupom(pedido))
+  medidor.document.close()
+
   setTimeout(() => {
-    // Mede altura real do conteúdo e injeta no @page para não desperdiçar papel
-    const alturaConteudo = w.document.body.scrollHeight + 8
-    const styleExato = w.document.createElement('style')
-    styleExato.textContent = `@page { size: 58mm ${alturaConteudo}px; margin: 0; }`
-    w.document.head.appendChild(styleExato)
-    w.resizeTo(320, alturaConteudo + 40)
-    w.focus()
-    w.print()
-    w.onafterprint = () => w.close()
-  }, 350)
+    const alturaPixels = medidor.document.body.scrollHeight
+    // Converte px (96dpi) para mm: 1px = 25.4/96 mm
+    const alturaMm = Math.ceil(alturaPixels * 25.4 / 96) + 6
+    medidor.close()
+
+    // Passo 2: abre janela de impressão com @page já no tamanho exato
+    const w = window.open('', '_blank', `width=220,height=${alturaPixels + 40},left=0,top=0`)
+    if (!w) { alert('Permita pop-ups para imprimir.'); return }
+    w.document.write(gerarCupom(pedido, alturaMm))
+    w.document.close()
+    setTimeout(() => {
+      w.focus()
+      w.print()
+      w.onafterprint = () => w.close()
+    }, 300)
+  }, 400)
 }
 
 function CardStat({ label, valor, sub, cor }) {
