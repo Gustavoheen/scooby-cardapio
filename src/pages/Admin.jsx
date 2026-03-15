@@ -28,14 +28,14 @@ function filtrarPedidos(pedidos, dataFiltro, pagamentoFiltro) {
 
 function gerarCupom(pedido, alturaMm) {
   const itens = pedido.itensPedido.split(' | ').map(i => `<div class="item">• ${i}</div>`).join('')
-  const pageSize = alturaMm ? `58mm ${alturaMm}mm` : '58mm auto'
+  const pageSize = alturaMm ? `76mm ${alturaMm}mm` : '76mm auto'
   return `<!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>Pedido</title>
 <style>
   @page { size: ${pageSize} !important; margin: 0 !important; }
-  html { margin: 0; padding: 0; width: 58mm; height: auto; overflow: hidden; }
+  html { margin: 0; padding: 0; width: 76mm; height: auto; overflow: hidden; }
   * { box-sizing: border-box; }
-  body { font-family: 'Courier New', monospace; font-size: 11px; width: 54mm; margin: 2mm; padding: 0; color: #000; height: auto; overflow: hidden; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body { font-family: 'Courier New', monospace; font-size: 11px; width: 72mm; margin: 2mm; padding: 0; color: #000; height: auto; overflow: hidden; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   * { color: #000 !important; -webkit-font-smoothing: none; font-weight: 500; }
   .center { text-align: center; }
   .bold { font-weight: 900; }
@@ -76,8 +76,8 @@ function gerarCupom(pedido, alturaMm) {
 
 function imprimirPedido(pedido) {
   // Passo 1: renderiza invisível para medir a altura real do conteúdo
-  // 58mm a 96dpi = 58 * 96 / 25.4 ≈ 219px
-  const medidor = window.open('', '_blank', 'width=219,height=100,left=-9999,top=-9999')
+  // 76mm a 96dpi = 58 * 96 / 25.4 ≈ 219px
+  const medidor = window.open('', '_blank', 'width=287,height=100,left=-9999,top=-9999')
   if (!medidor) { alert('Permita pop-ups para imprimir.'); return }
   medidor.document.write(gerarCupom(pedido))
   medidor.document.close()
@@ -89,7 +89,7 @@ function imprimirPedido(pedido) {
     medidor.close()
 
     // Passo 2: abre janela de impressão com @page já no tamanho exato
-    const w = window.open('', '_blank', `width=219,height=${alturaPixels + 40},left=0,top=0`)
+    const w = window.open('', '_blank', `width=287,height=${alturaPixels + 40},left=0,top=0`)
     if (!w) { alert('Permita pop-ups para imprimir.'); return }
     w.document.write(gerarCupom(pedido, alturaMm))
     w.document.close()
