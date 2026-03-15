@@ -661,12 +661,14 @@ export default function Admin() {
     setConectando(true)
     try {
       qz.security.setCertificatePromise((resolve) => resolve(CERTIFICATE))
+      qz.security.setSignatureAlgorithm('SHA512')
       qz.security.setSignaturePromise((toSign) => (resolve, reject) =>
         assinarQZ(toSign).then(resolve).catch(reject)
       )
       if (!qz.websocket.isActive()) await qz.websocket.connect()
       setImpressoraConectada(true)
     } catch (err) {
+      console.error('QZ Tray connect error:', err)
       alert('Não foi possível conectar ao QZ Tray.\n\nVerifique se o programa está instalado e rodando (ícone na bandeja do Windows).\n\nSe necessário, abra o Chrome, acesse https://localhost:8181 e clique em "Avançado → Continuar".')
     } finally {
       setConectando(false)

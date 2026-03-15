@@ -54,17 +54,20 @@ zSuz6ASCQjEPxhpT8rbqqHUC
 export { CERTIFICATE }
 
 export async function assinarQZ(toSign) {
-  const pem = PRIVATE_KEY.replace(/-----BEGIN PRIVATE KEY-----|-----END PRIVATE KEY-----|\r?\n/g, '')
+  const pem = PRIVATE_KEY
+    .replace('-----BEGIN PRIVATE KEY-----', '')
+    .replace('-----END PRIVATE KEY-----', '')
+    .replace(/\s+/g, '')
   const keyBuffer = Uint8Array.from(atob(pem), c => c.charCodeAt(0))
   const cryptoKey = await crypto.subtle.importKey(
     'pkcs8',
     keyBuffer,
-    { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-512' },
+    { name: 'RSASSA-PKCS1-v1_5', hash: { name: 'SHA-512' } },
     false,
     ['sign']
   )
   const signature = await crypto.subtle.sign(
-    'RSASSA-PKCS1-v1_5',
+    { name: 'RSASSA-PKCS1-v1_5' },
     cryptoKey,
     new TextEncoder().encode(toSign)
   )
