@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import qz from 'qz-tray'
+import { CERTIFICATE, assinarQZ } from '../utils/qzCert'
 import * as XLSX from 'xlsx'
 import { categorias, ADICIONAIS } from '../data/cardapio'
 import { CONFIG } from '../config'
@@ -659,8 +660,10 @@ export default function Admin() {
   async function conectarImpressora() {
     setConectando(true)
     try {
-      qz.security.setCertificatePromise((resolve) => resolve())
-      qz.security.setSignaturePromise(() => (resolve) => resolve())
+      qz.security.setCertificatePromise((resolve) => resolve(CERTIFICATE))
+      qz.security.setSignaturePromise((toSign) => (resolve, reject) =>
+        assinarQZ(toSign).then(resolve).catch(reject)
+      )
       if (!qz.websocket.isActive()) await qz.websocket.connect()
       setImpressoraConectada(true)
     } catch (err) {
