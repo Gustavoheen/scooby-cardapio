@@ -9,7 +9,7 @@ function getSupabase() {
 
 module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*')
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS')
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
 
   if (req.method === 'OPTIONS') return res.status(200).end()
@@ -44,6 +44,19 @@ module.exports = async function handler(req, res) {
         .insert({ id, data: payload })
       if (error) throw error
       return res.status(200).json({ sucesso: true, numeroPedido })
+    }
+    if (req.method === 'DELETE') {
+      const { id, telefone } = req.query
+      if (id) {
+        const { error } = await supabase.from('orders').delete().eq('id', id)
+        if (error) throw error
+      } else if (telefone) {
+        const { error } = await supabase.from('orders').delete().filter('data->>telefone', 'eq', telefone)
+        if (error) throw error
+      } else {
+        return res.status(400).json({ erro: 'Informe id ou telefone' })
+      }
+      return res.status(200).json({ sucesso: true })
     }
   } catch (err) {
     return res.status(500).json({ erro: err.message })

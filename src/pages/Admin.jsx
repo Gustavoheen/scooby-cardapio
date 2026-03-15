@@ -246,7 +246,7 @@ function gerarMsgWhatsApp(pedido) {
   return encodeURIComponent(linhas.join('\n'))
 }
 
-function CardPedido({ pedido, onImprimir, selecionado, onToggleSelecionado, infoImpressao }) {
+function CardPedido({ pedido, onImprimir, onExcluir, selecionado, onToggleSelecionado, infoImpressao }) {
   const [expandido, setExpandido] = useState(false)
   const detalhesRef = useRef(null)
   const id = pedido.numeroPedido || pedido.id
@@ -410,10 +410,114 @@ function CardPedido({ pedido, onImprimir, selecionado, onToggleSelecionado, info
               >
                 🖨️ {infoImpressao ? 'Reimprimir' : 'Imprimir'}
               </button>
+              <button
+                onClick={() => onExcluir(pedido)}
+                className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg bg-red-900/50 hover:bg-red-800/60 text-red-300 transition"
+              >
+                🗑️ Excluir
+              </button>
             </div>
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+function CardCliente({ cliente: c, onExcluir, onEditar }) {
+  const [editando, setEditando] = useState(false)
+  const [novoNome, setNovoNome] = useState(c.nome)
+  const [salvando, setSalvando] = useState(false)
+
+  async function salvar() {
+    if (!novoNome.trim()) return
+    setSalvando(true)
+    await onEditar(c, novoNome.trim())
+    setSalvando(false)
+    setEditando(false)
+  }
+
+  return (
+    <div className="bg-scooby-card border border-scooby-borda rounded-2xl px-5 py-4 flex flex-wrap gap-4 items-center">
+      {/* Avatar */}
+      <div className="w-10 h-10 rounded-full bg-scooby-vermelho flex items-center justify-center font-bold text-white text-lg flex-shrink-0">
+        {c.nome.charAt(0).toUpperCase()}
+      </div>
+
+      {/* Info principal */}
+      <div className="flex-1 min-w-0">
+        {editando ? (
+          <div className="flex items-center gap-2">
+            <input
+              autoFocus
+              value={novoNome}
+              onChange={e => setNovoNome(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') salvar(); if (e.key === 'Escape') setEditando(false) }}
+              className="bg-scooby-escuro border border-scooby-amarelo text-white rounded-lg px-3 py-1 text-sm focus:outline-none w-48"
+            />
+            <button onClick={salvar} disabled={salvando} className="text-xs text-green-400 hover:text-green-300 font-semibold">
+              {salvando ? '...' : '✓ Salvar'}
+            </button>
+            <button onClick={() => { setEditando(false); setNovoNome(c.nome) }} className="text-xs text-gray-500 hover:text-gray-300">
+              Cancelar
+            </button>
+          </div>
+        ) : (
+          <p className="text-white font-semibold">{c.nome}</p>
+        )}
+        <div className="flex flex-wrap gap-3 mt-0.5">
+          {c.telefone !== '—' && (
+            <a href={`https://wa.me/55${c.telefone.replace(/\D/g, '')}`} target="_blank" rel="noreferrer" className="text-green-400 text-xs hover:underline">
+              📱 {c.telefone}
+            </a>
+          )}
+          {c.endereco && c.endereco !== 'Retirar no local' && (
+            <p className="text-gray-500 text-xs truncate max-w-xs">📍 {c.endereco}</p>
+          )}
+        </div>
+      </div>
+
+      {/* Stats */}
+      <div className="flex gap-4 flex-shrink-0 text-center">
+        <div>
+          <p className="text-white font-bold text-lg">{c.pedidos.length}</p>
+          <p className="text-gray-500 text-xs">pedidos</p>
+        </div>
+        <div>
+          <p className="text-scooby-amarelo font-bold text-lg">R$ {c.totalGasto.toFixed(2).replace('.', ',')}</p>
+          <p className="text-gray-500 text-xs">total gasto</p>
+        </div>
+        <div>
+          <p className="text-gray-300 font-bold text-lg">R$ {(c.totalGasto / c.pedidos.length).toFixed(2).replace('.', ',')}</p>
+          <p className="text-gray-500 text-xs">ticket médio</p>
+        </div>
+      </div>
+
+      {/* Último pedido */}
+      <div className="text-xs text-gray-500 flex-shrink-0">
+        <p>Último pedido</p>
+        <p className="text-gray-300">{c.pedidos[0]?.data} {c.pedidos[0]?.hora}</p>
+      </div>
+
+      {/* Ações */}
+      <div className="flex gap-2 flex-shrink-0">
+        {!editando && c.telefone !== '—' && (
+          <button
+            onClick={() => setEditando(true)}
+            className="text-xs px-2.5 py-1.5 rounded-lg bg-gray-700 hover:bg-gray-600 text-gray-300 transition"
+            title="Editar nome"
+          >
+            ✏️
+          </button>
+        )}
+        <button
+          onClick={() => onExcluir(c)}
+          className="text-xs px-2.5 py-1.5 rounded-lg bg-red-900/50 hover:bg-red-800/60 text-red-300 transition"
+          title="Excluir cliente e pedidos"
+        >
+          🗑️
+        </button>
+      </div>
     </div>
   )
 }
@@ -823,6 +927,17 @@ export default function Admin() {
     pedidosImpressosRef.current = novos
     setPedidosImpressos(novos)
     localStorage.setItem('scooby_impressos', JSON.stringify(novos))
+  }
+
+  async function handleExcluirPedido(pedido) {
+    const id = pedido.numeroPedido || pedido.id
+    if (!window.confirm(`Excluir pedido ${id} de ${pedido.nomeCliente}?\n\nEsta ação não pode ser desfeita.`)) return
+    const res = await fetch(`/api/pedido?id=${pedido.id}`, { method: 'DELETE' })
+    if (res.ok) {
+      setPedidos(prev => prev.filter(p => p.id !== pedido.id))
+    } else {
+      alert('Erro ao excluir pedido.')
+    }
   }
 
   function toggleSelecionado(id) {
@@ -1236,6 +1351,7 @@ export default function Admin() {
                   key={p.id || i}
                   pedido={p}
                   onImprimir={handleImprimir}
+                  onExcluir={handleExcluirPedido}
                   selecionado={selecionados.has(p.numeroPedido || p.id)}
                   onToggleSelecionado={toggleSelecionado}
                   infoImpressao={pedidosImpressos[p.numeroPedido || p.id] || null}
@@ -1273,54 +1389,28 @@ export default function Admin() {
           ) : (
             <div className="space-y-3">
               {clientes.map((c, i) => (
-                <div key={i} className="bg-scooby-card border border-scooby-borda rounded-2xl px-5 py-4 flex flex-wrap gap-4 items-center">
-                  {/* Avatar */}
-                  <div className="w-10 h-10 rounded-full bg-scooby-vermelho flex items-center justify-center font-bold text-white text-lg flex-shrink-0">
-                    {c.nome.charAt(0).toUpperCase()}
-                  </div>
-
-                  {/* Info principal */}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-white font-semibold">{c.nome}</p>
-                    <div className="flex flex-wrap gap-3 mt-0.5">
-                      {c.telefone !== '—' && (
-                        <a
-                          href={`https://wa.me/55${c.telefone.replace(/\D/g, '')}`}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-green-400 text-xs hover:underline"
-                        >
-                          📱 {c.telefone}
-                        </a>
-                      )}
-                      {c.endereco && c.endereco !== 'Retirar no local' && (
-                        <p className="text-gray-500 text-xs truncate max-w-xs">📍 {c.endereco}</p>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Stats */}
-                  <div className="flex gap-4 flex-shrink-0 text-center">
-                    <div>
-                      <p className="text-white font-bold text-lg">{c.pedidos.length}</p>
-                      <p className="text-gray-500 text-xs">pedidos</p>
-                    </div>
-                    <div>
-                      <p className="text-scooby-amarelo font-bold text-lg">R$ {c.totalGasto.toFixed(2).replace('.', ',')}</p>
-                      <p className="text-gray-500 text-xs">total gasto</p>
-                    </div>
-                    <div>
-                      <p className="text-gray-300 font-bold text-lg">R$ {(c.totalGasto / c.pedidos.length).toFixed(2).replace('.', ',')}</p>
-                      <p className="text-gray-500 text-xs">ticket médio</p>
-                    </div>
-                  </div>
-
-                  {/* Último pedido */}
-                  <div className="text-xs text-gray-500 flex-shrink-0">
-                    <p>Último pedido</p>
-                    <p className="text-gray-300">{c.pedidos[0]?.data} {c.pedidos[0]?.hora}</p>
-                  </div>
-                </div>
+                <CardCliente
+                  key={i}
+                  cliente={c}
+                  onExcluir={async (cliente) => {
+                    const total = cliente.pedidos.length
+                    if (!window.confirm(`Excluir ${cliente.nome} e todos os ${total} pedidos?\n\nEsta ação não pode ser desfeita.`)) return
+                    await fetch(`/api/clientes?telefone=${cliente.telefone}`, { method: 'DELETE' })
+                    if (cliente.telefone !== '—') {
+                      await fetch(`/api/pedido?telefone=${cliente.telefone}`, { method: 'DELETE' })
+                      setPedidos(prev => prev.filter(p => p.telefone?.replace(/\D/g, '') !== cliente.telefone.replace(/\D/g, '')))
+                    }
+                  }}
+                  onEditar={async (cliente, novoNome) => {
+                    if (cliente.telefone === '—') return
+                    const res = await fetch('/api/clientes', {
+                      method: 'PUT',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ telefone: cliente.telefone, nome: novoNome }),
+                    })
+                    if (!res.ok) alert('Erro ao salvar.')
+                  }}
+                />
               ))}
             </div>
           )}

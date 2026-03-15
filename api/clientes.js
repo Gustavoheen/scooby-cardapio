@@ -9,7 +9,7 @@ function getSupabase() {
 
 module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*')
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
 
   if (req.method === 'OPTIONS') return res.status(200).end()
@@ -46,6 +46,24 @@ module.exports = async function handler(req, res) {
           atualizadoEm: new Date().toISOString(),
         }, { onConflict: 'telefone' })
 
+      if (error) throw error
+      return res.status(200).json({ sucesso: true })
+    }
+    if (req.method === 'PUT') {
+      const { telefone, nome } = req.body
+      if (!telefone) return res.status(400).json({ erro: 'Informe o telefone' })
+      const { error } = await supabase
+        .from('clients')
+        .update({ nome, atualizadoEm: new Date().toISOString() })
+        .eq('telefone', telefone)
+      if (error) throw error
+      return res.status(200).json({ sucesso: true })
+    }
+
+    if (req.method === 'DELETE') {
+      const { telefone } = req.query
+      if (!telefone) return res.status(400).json({ erro: 'Informe o telefone' })
+      const { error } = await supabase.from('clients').delete().eq('telefone', telefone)
       if (error) throw error
       return res.status(200).json({ sucesso: true })
     }
