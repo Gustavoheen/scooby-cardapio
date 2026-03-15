@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
+import qz from 'qz-tray'
 import * as XLSX from 'xlsx'
 import { categorias, ADICIONAIS } from '../data/cardapio'
 import { CONFIG } from '../config'
@@ -649,7 +650,6 @@ export default function Admin() {
   const [mostrarGuiaImpressora, setMostrarGuiaImpressora] = useState(false)
   const [impressoraConectada, setImpressoraConectada] = useState(false)
   const [conectando, setConectando] = useState(false)
-  const portaRef = useRef(null)
 
   function salvarNomeImpressora(nome) {
     setNomeImpressora(nome)
@@ -657,39 +657,36 @@ export default function Admin() {
   }
 
   async function conectarImpressora() {
-    if (!('serial' in navigator)) {
-      alert('Use Chrome ou Edge para impressão direta.')
-      return
-    }
     setConectando(true)
     try {
-      const porta = await navigator.serial.requestPort()
-      await porta.open({ baudRate: 9600 })
-      portaRef.current = porta
+      qz.security.setCertificatePromise((resolve) => resolve())
+      qz.security.setSignaturePromise(() => (resolve) => resolve())
+      if (!qz.websocket.isActive()) await qz.websocket.connect()
       setImpressoraConectada(true)
     } catch (err) {
-      if (err.name !== 'NotSelectedError') alert('Erro ao conectar: ' + err.message)
+      alert('Não foi possível conectar ao QZ Tray.\n\nVerifique se o programa está instalado e rodando (ícone na bandeja do Windows).\n\nSe necessário, abra o Chrome, acesse https://localhost:8181 e clique em "Avançado → Continuar".')
     } finally {
       setConectando(false)
     }
   }
 
   async function desconectarImpressora() {
-    try { await portaRef.current?.close() } catch {}
-    portaRef.current = null
+    try { await qz.websocket.disconnect() } catch {}
     setImpressoraConectada(false)
   }
 
   async function imprimirEscPos(pedido) {
-    if (!portaRef.current) { imprimirPedido(pedido); return }
+    if (!qz.websocket.isActive()) { imprimirPedido(pedido); return }
     try {
-      const writer = portaRef.current.writable.getWriter()
-      await writer.write(gerarEscPos(pedido))
-      writer.releaseLock()
+      let impressora = nomeImpressora
+      try { await qz.printers.find(impressora) } catch { impressora = await qz.printers.getDefault() }
+      const config = qz.configs.create(impressora)
+      const bytes = gerarEscPos(pedido)
+      let bin = ''
+      for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i])
+      await qz.print(config, [{ type: 'raw', format: 'base64', data: btoa(bin) }])
     } catch (err) {
-      console.error('Erro ESC/POS:', err)
-      setImpressoraConectada(false)
-      portaRef.current = null
+      console.error('Erro QZ Tray:', err)
       imprimirPedido(pedido)
     }
   }
@@ -1873,16 +1870,19 @@ export default function Admin() {
 
             {mostrarGuiaImpressora && (
               <div className="bg-scooby-escuro rounded-xl p-4 space-y-3 text-sm">
-                <p className="text-scooby-amarelo font-bold">Como configurar a PSO58 para imprimir sem diálogo:</p>
+                <p className="text-scooby-amarelo font-bold">Como configurar o QZ Tray para imprimir direto (1x por computador):</p>
                 <ol className="space-y-2 text-gray-300 list-decimal list-inside">
-                  <li>Conecte a PSO58 via USB e instale o driver (mesmo driver do iFood).</li>
-                  <li>Abra <span className="text-white font-mono bg-gray-800 px-1 rounded">Painel de Controle → Dispositivos e Impressoras</span>, clique com o botão direito na PSO58 e selecione <span className="text-white font-semibold">Definir como impressora padrão</span>.</li>
-                  <li>No Chrome, acesse <span className="text-white font-mono bg-gray-800 px-1 rounded">chrome://settings/</span> → Privacidade e segurança → Configurações do site → Configurações adicionais → PDF → marque <span className="text-white font-semibold">Fazer download de PDFs</span> como desativado.</li>
-                  <li>Clique em <span className="text-white font-semibold">🖨️ Imprimir cupom de teste</span> acima. No diálogo que abrir, selecione a <span className="text-white font-semibold">{nomeImpressora || 'PSO58'}</span> e clique em Imprimir.</li>
-                  <li>O Chrome lembrará da última impressora usada. A partir daí, toda impressão irá direto para a <span className="text-white font-semibold">{nomeImpressora || 'PSO58'}</span> automaticamente.</li>
+                  <li>Baixe o QZ Tray em <span className="text-white font-mono bg-gray-800 px-1 rounded">qz.io/download</span> e instale normalmente (Next → Next → Install).</li>
+                  <li>O QZ Tray vai aparecer na <span className="text-white font-semibold">bandeja do Windows</span> (barra de tarefas, canto inferior direito). Deixe rodando.</li>
+                  <li>No Chrome, acesse <span className="text-white font-mono bg-gray-800 px-1 rounded">https://localhost:8181</span> e clique em <span className="text-white font-semibold">Avançado → Continuar</span> para aceitar o certificado local. Só precisa fazer isso uma vez.</li>
+                  <li>Volte ao painel e clique em <span className="text-white font-semibold">🔗 Conectar QZ Tray</span> acima. Se pedir permissão, clique em <span className="text-white font-semibold">Permitir</span>.</li>
+                  <li>Clique em <span className="text-white font-semibold">🖨️ Imprimir cupom de teste</span> para confirmar que está funcionando.</li>
                 </ol>
-                <div className="bg-yellow-900/30 border border-yellow-700/40 rounded-lg px-3 py-2 text-yellow-300 text-xs mt-2">
-                  💡 O papel tem 76mm de largura. No driver da impressora, configure o tamanho do papel como <strong>76mm × variável</strong> (ou "Roll Paper 76mm"). Isso evita que a impressora avance papel em excesso.
+                <div className="bg-green-900/30 border border-green-700/40 rounded-lg px-3 py-2 text-green-300 text-xs mt-2">
+                  ✅ Após conectar uma vez, o QZ Tray inicia automático com o Windows. Basta abrir o painel e clicar em Conectar.
+                </div>
+                <div className="bg-yellow-900/30 border border-yellow-700/40 rounded-lg px-3 py-2 text-yellow-300 text-xs">
+                  💡 O nome da impressora deve ser exatamente igual ao que aparece em <strong>Dispositivos e Impressoras</strong> no Windows (ex: KP-IM607).
                 </div>
               </div>
             )}
