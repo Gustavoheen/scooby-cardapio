@@ -31,15 +31,16 @@ function gerarCupom(pedido) {
   return `<!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>Pedido</title>
 <style>
-  @page { size: 58mm auto; margin: 2mm 1mm; }
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: 'Courier New', monospace; font-size: 11px; width: 54mm; color: #000; }
+  @page { size: 58mm auto; margin: 0; }
+  html, body { margin: 0; padding: 0; height: auto; }
+  * { box-sizing: border-box; }
+  body { font-family: 'Courier New', monospace; font-size: 11px; width: 56mm; padding: 2mm 1mm; color: #000; display: inline-block; }
   .center { text-align: center; }
   .bold { font-weight: bold; }
   .big { font-size: 13px; }
-  .line { border-top: 1px dashed #000; margin: 4px 0; }
+  .line { border-top: 1px dashed #000; margin: 3px 0; }
   .row { display: flex; justify-content: space-between; margin: 1px 0; }
-  .item { margin: 1px 0; }
+  .item { margin: 1px 0; font-size: 10.5px; }
   .total-row { display: flex; justify-content: space-between; font-weight: bold; font-size: 13px; margin: 2px 0; }
 </style></head>
 <body>
@@ -72,12 +73,15 @@ function gerarCupom(pedido) {
 }
 
 function imprimirPedido(pedido) {
-  const w = window.open('', '_blank', 'width=320,height=600,left=0,top=0')
+  const w = window.open('', '_blank', 'width=320,height=200,left=0,top=0')
   if (!w) { alert('Permita pop-ups para imprimir.'); return }
   w.document.write(gerarCupom(pedido))
   w.document.close()
-  w.focus()
   setTimeout(() => {
+    // Redimensiona para o tamanho real do conteúdo antes de imprimir
+    const alturaConteudo = w.document.body.scrollHeight + 20
+    w.resizeTo(320, alturaConteudo)
+    w.focus()
     w.print()
     w.onafterprint = () => w.close()
   }, 300)
