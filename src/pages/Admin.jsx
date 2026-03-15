@@ -29,28 +29,27 @@ function filtrarPedidos(pedidos, dataFiltro, pagamentoFiltro) {
 }
 
 // ── ESC/POS — impressão direta na térmica ────────────────────────
-const COLS = 42 // caracteres por linha no papel 76mm
+const COLS = 32 // KP-IM607: 32 caracteres por linha
 
-function encodeCP1252(str) {
+function encode(str) {
+  // CP850 (DOS Latin 1) — compatível com impressoras térmicas brasileiras
   const map = {
-    'À':0xC0,'Á':0xC1,'Â':0xC2,'Ã':0xC3,'Ä':0xC4,
-    'È':0xC8,'É':0xC9,'Ê':0xCA,'Ë':0xCB,
-    'Í':0xCD,'Ó':0xD3,'Ô':0xD4,'Õ':0xD5,'Ú':0xDA,
-    'Ç':0xC7,'Ñ':0xD1,
-    'à':0xE0,'á':0xE1,'â':0xE2,'ã':0xE3,'ä':0xE4,
-    'è':0xE8,'é':0xE9,'ê':0xEA,'ë':0xEB,
-    'í':0xED,'ó':0xF3,'ô':0xF4,'õ':0xF5,'ú':0xFA,
-    'ç':0xE7,'ñ':0xF1,
+    'Ç':0x80,'é':0x82,'â':0x83,'à':0x85,'ç':0x87,
+    'ê':0x88,'è':0x8A,'É':0x90,'ô':0x93,'ó':0xA2,
+    'ú':0xA3,'Á':0xB5,'Â':0xB6,'À':0xB7,'ã':0xC6,
+    'Ã':0xC7,'Ê':0xD2,'Í':0xD6,'Ó':0xE0,'õ':0xE4,
+    'Õ':0xE5,'Ú':0xE9,'á':0xA0,'í':0xA1,'ñ':0xA4,
+    'Ñ':0xA5,'ü':0x81,'ö':0x94,'ù':0x97,'î':0x8C,
   }
   const bytes = []
-  for (const c of str) bytes.push(map[c] ?? (c.charCodeAt(0) < 256 ? c.charCodeAt(0) : 0x3F))
+  for (const c of str) bytes.push(map[c] ?? (c.charCodeAt(0) < 128 ? c.charCodeAt(0) : 0x3F))
   return bytes
 }
 
 function gerarEscPos(pedido) {
   const bytes = []
   const push   = (...b) => bytes.push(...b)
-  const txt    = (s) => bytes.push(...encodeCP1252(String(s)))
+  const txt    = (s) => bytes.push(...encode(String(s)))
   const nl     = (n = 1) => { for (let i = 0; i < n; i++) push(0x0A) }
   const centro = () => push(0x1B, 0x61, 0x01)
   const esq    = () => push(0x1B, 0x61, 0x00)
@@ -76,23 +75,45 @@ function gerarEscPos(pedido) {
     if (line) { txt(prefix + line); nl() }
   }
 
+  function printItem(item) {
+    const m = item.match(/^(.+?)\s+(R\$[\d.,]+)$/)
+    if (!m) { wrapTxt(item, '  '); return }
+    const [, nome, preco] = m
+    if (nome.length + 1 + preco.length <= COLS) { row(nome, preco); return }
+    // Nome longo: quebra em linhas, preço na última
+    const W = COLS - 2
+    const words = nome.split(' ')
+    const lines = []
+    let cur = ''
+    for (const w of words) {
+      const t = cur ? cur + ' ' + w : w
+      if (t.length <= W) cur = t
+      else { if (cur) lines.push(cur); cur = w }
+    }
+    if (cur) lines.push(cur)
+    lines.slice(0, -1).forEach(l => { txt('  ' + l); nl() })
+    const last = '  ' + lines[lines.length - 1]
+    txt(last + ' '.repeat(Math.max(1, COLS - last.length - preco.length)) + preco); nl()
+  }
+
   // Init
   push(0x1B, 0x40)       // ESC @ reset
-  push(0x1B, 0x74, 0x10) // ESC t 16 — CP1252
+  push(0x1B, 0x74, 0x02) // ESC t 2 — CP850
 
   // Cabeçalho
   centro(); bold(true); grande(true)
-  txt('SCOOBY-DOO LANCHES'); nl()
-  grande(false); bold(false)
+  txt('SCOOBY-DOO'); nl()
+  txt('LANCHES'); nl()
+  grande(false)
   txt('Hamburguer Artesanal'); nl()
-  esq(); linha()
+  bold(false); esq(); linha()
 
   row('Pedido:', pedido.numeroPedido || pedido.id || '—')
   row('Data:', `${pedido.data} ${pedido.hora}`)
   linha()
 
   bold(true); txt('ITENS:'); nl(); bold(false)
-  pedido.itensPedido.split(' | ').forEach(item => wrapTxt(item, '* '))
+  pedido.itensPedido.split(' | ').forEach(printItem)
   linha()
 
   row('Subtotal:', `R$ ${pedido.subtotal}`)
@@ -110,7 +131,7 @@ function gerarEscPos(pedido) {
   txt(pedido.nomeCliente); nl()
   if (pedido.telefone) { txt(`Tel: ${pedido.telefone}`); nl() }
   if (pedido.tipoEntrega === 'Entrega' && pedido.endereco) wrapTxt(`End: ${pedido.endereco}`)
-  if (pedido.observacao) { linha(); bold(true); txt('OBS:'); nl(); bold(false); wrapTxt(pedido.observacao) }
+  if (pedido.observacao) { linha(); bold(true); txt('OBS:'); bold(false); nl(); wrapTxt(pedido.observacao) }
 
   linha()
   centro(); txt('Obrigado pela preferencia!'); nl()
