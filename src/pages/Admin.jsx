@@ -26,6 +26,100 @@ function filtrarPedidos(pedidos, dataFiltro, pagamentoFiltro) {
   })
 }
 
+// ── ESC/POS — impressão direta na térmica ────────────────────────
+const COLS = 42 // caracteres por linha no papel 76mm
+
+function encodeCP1252(str) {
+  const map = {
+    'À':0xC0,'Á':0xC1,'Â':0xC2,'Ã':0xC3,'Ä':0xC4,
+    'È':0xC8,'É':0xC9,'Ê':0xCA,'Ë':0xCB,
+    'Í':0xCD,'Ó':0xD3,'Ô':0xD4,'Õ':0xD5,'Ú':0xDA,
+    'Ç':0xC7,'Ñ':0xD1,
+    'à':0xE0,'á':0xE1,'â':0xE2,'ã':0xE3,'ä':0xE4,
+    'è':0xE8,'é':0xE9,'ê':0xEA,'ë':0xEB,
+    'í':0xED,'ó':0xF3,'ô':0xF4,'õ':0xF5,'ú':0xFA,
+    'ç':0xE7,'ñ':0xF1,
+  }
+  const bytes = []
+  for (const c of str) bytes.push(map[c] ?? (c.charCodeAt(0) < 256 ? c.charCodeAt(0) : 0x3F))
+  return bytes
+}
+
+function gerarEscPos(pedido) {
+  const bytes = []
+  const push   = (...b) => bytes.push(...b)
+  const txt    = (s) => bytes.push(...encodeCP1252(String(s)))
+  const nl     = (n = 1) => { for (let i = 0; i < n; i++) push(0x0A) }
+  const centro = () => push(0x1B, 0x61, 0x01)
+  const esq    = () => push(0x1B, 0x61, 0x00)
+  const bold   = (on) => push(0x1B, 0x45, on ? 1 : 0)
+  const grande = (on) => push(0x1B, 0x21, on ? 0x30 : 0x00)
+  const linha  = () => { txt('-'.repeat(COLS)); nl() }
+
+  function row(left, right) {
+    const r = String(right)
+    const l = String(left).substring(0, COLS - r.length - 1)
+    const pad = COLS - l.length - r.length
+    txt(l + ' '.repeat(Math.max(1, pad)) + r); nl()
+  }
+
+  function wrapTxt(s, prefix = '') {
+    const width = COLS - prefix.length
+    const words = s.split(' ')
+    let line = ''
+    for (const w of words) {
+      if ((line + ' ' + w).trim().length <= width) line = (line + ' ' + w).trim()
+      else { txt(prefix + line); nl(); line = w }
+    }
+    if (line) { txt(prefix + line); nl() }
+  }
+
+  // Init
+  push(0x1B, 0x40)       // ESC @ reset
+  push(0x1B, 0x74, 0x10) // ESC t 16 — CP1252
+
+  // Cabeçalho
+  centro(); bold(true); grande(true)
+  txt('SCOOBY-DOO LANCHES'); nl()
+  grande(false); bold(false)
+  txt('Hamburguer Artesanal'); nl()
+  esq(); linha()
+
+  row('Pedido:', pedido.numeroPedido || pedido.id || '—')
+  row('Data:', `${pedido.data} ${pedido.hora}`)
+  linha()
+
+  bold(true); txt('ITENS:'); nl(); bold(false)
+  pedido.itensPedido.split(' | ').forEach(item => wrapTxt(item, '* '))
+  linha()
+
+  row('Subtotal:', `R$ ${pedido.subtotal}`)
+  if (pedido.tipoEntrega === 'Entrega') row('Taxa entrega:', `R$ ${pedido.taxaEntrega}`)
+  if (pedido.desconto && parseFloat(pedido.desconto) > 0) row('Desconto:', `-R$ ${pedido.desconto}`)
+  linha()
+  bold(true); row('TOTAL:', `R$ ${pedido.total}`); bold(false)
+  linha()
+
+  row('Pagamento:', pedido.pagamento)
+  row('Tipo:', pedido.tipoEntrega)
+  linha()
+
+  bold(true); txt('CLIENTE:'); nl(); bold(false)
+  txt(pedido.nomeCliente); nl()
+  if (pedido.telefone) { txt(`Tel: ${pedido.telefone}`); nl() }
+  if (pedido.tipoEntrega === 'Entrega' && pedido.endereco) wrapTxt(`End: ${pedido.endereco}`)
+  if (pedido.observacao) { linha(); bold(true); txt('OBS:'); nl(); bold(false); wrapTxt(pedido.observacao) }
+
+  linha()
+  centro(); txt('Obrigado pela preferencia!'); nl()
+  esq()
+
+  nl(3)
+  push(0x1D, 0x56, 0x41, 0x10) // GS V — corte parcial
+
+  return new Uint8Array(bytes)
+}
+
 function gerarCupom(pedido, alturaMm) {
   const itens = pedido.itensPedido.split(' | ').map(i => `<div class="item">• ${i}</div>`).join('')
   const pageSize = alturaMm ? `76mm ${alturaMm}mm` : '76mm auto'
@@ -550,13 +644,54 @@ export default function Admin() {
 
   // ── Impressora ────────────────────────────────────────────────
   const [nomeImpressora, setNomeImpressora] = useState(
-    localStorage.getItem('scooby_impressora') || 'PSO58'
+    localStorage.getItem('scooby_impressora') || 'KP-IM607'
   )
   const [mostrarGuiaImpressora, setMostrarGuiaImpressora] = useState(false)
+  const [impressoraConectada, setImpressoraConectada] = useState(false)
+  const [conectando, setConectando] = useState(false)
+  const portaRef = useRef(null)
 
   function salvarNomeImpressora(nome) {
     setNomeImpressora(nome)
     localStorage.setItem('scooby_impressora', nome)
+  }
+
+  async function conectarImpressora() {
+    if (!('serial' in navigator)) {
+      alert('Use Chrome ou Edge para impressão direta.')
+      return
+    }
+    setConectando(true)
+    try {
+      const porta = await navigator.serial.requestPort()
+      await porta.open({ baudRate: 9600 })
+      portaRef.current = porta
+      setImpressoraConectada(true)
+    } catch (err) {
+      if (err.name !== 'NotSelectedError') alert('Erro ao conectar: ' + err.message)
+    } finally {
+      setConectando(false)
+    }
+  }
+
+  async function desconectarImpressora() {
+    try { await portaRef.current?.close() } catch {}
+    portaRef.current = null
+    setImpressoraConectada(false)
+  }
+
+  async function imprimirEscPos(pedido) {
+    if (!portaRef.current) { imprimirPedido(pedido); return }
+    try {
+      const writer = portaRef.current.writable.getWriter()
+      await writer.write(gerarEscPos(pedido))
+      writer.releaseLock()
+    } catch (err) {
+      console.error('Erro ESC/POS:', err)
+      setImpressoraConectada(false)
+      portaRef.current = null
+      imprimirPedido(pedido)
+    }
   }
 
   // ── Auto-print ────────────────────────────────────────────────
@@ -588,7 +723,7 @@ export default function Admin() {
   }
 
   function handleImprimir(pedido, tipo = 'manual') {
-    imprimirPedido(pedido)
+    imprimirEscPos(pedido)
     const id = pedido.numeroPedido || pedido.id
     if (!id) return
     const hora = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
@@ -1697,6 +1832,28 @@ export default function Admin() {
               <p className="text-gray-500 text-xs mt-1">
                 Digite exatamente o nome que aparece no Windows (Painel de Controle → Dispositivos e Impressoras).
               </p>
+            </div>
+
+            <div className="flex items-center gap-3 p-3 bg-scooby-escuro rounded-xl border border-scooby-borda">
+              {impressoraConectada ? (
+                <button
+                  onClick={desconectarImpressora}
+                  className="px-4 py-2 bg-red-900/60 hover:bg-red-800/60 border border-red-700/50 text-red-300 text-sm font-semibold rounded-xl transition"
+                >
+                  🔌 Desconectar
+                </button>
+              ) : (
+                <button
+                  onClick={conectarImpressora}
+                  disabled={conectando}
+                  className="px-4 py-2 bg-green-900/60 hover:bg-green-800/60 border border-green-700/50 text-green-300 text-sm font-semibold rounded-xl transition disabled:opacity-50"
+                >
+                  {conectando ? '⏳ Conectando...' : '🔗 Conectar USB'}
+                </button>
+              )}
+              <span className={`text-sm font-medium ${impressoraConectada ? 'text-green-400' : 'text-gray-500'}`}>
+                {impressoraConectada ? '✅ Impressora conectada' : '⚫ Impressora desconectada'}
+              </span>
             </div>
 
             <div className="flex gap-3">
