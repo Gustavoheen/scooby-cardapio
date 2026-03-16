@@ -9,7 +9,7 @@ function getSupabase() {
 
 module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*')
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS')
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS')
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
 
   if (req.method === 'OPTIONS') return res.status(200).end()
@@ -85,6 +85,18 @@ module.exports = async function handler(req, res) {
         .insert({ id, data: payload })
       if (error) throw error
       return res.status(200).json({ sucesso: true, numeroPedido })
+    }
+
+    if (req.method === 'PATCH') {
+      // Confirmar pagamento Pix
+      const { id } = req.query
+      if (!id) return res.status(400).json({ erro: 'Informe o id do pedido' })
+      const { data: row, error: fetchErr } = await supabase.from('orders').select('data').eq('id', id).single()
+      if (fetchErr) throw fetchErr
+      const novaData = { ...row.data, pixConfirmado: true, pixConfirmadoEm: new Date().toISOString() }
+      const { error: updateErr } = await supabase.from('orders').update({ data: novaData }).eq('id', id)
+      if (updateErr) throw updateErr
+      return res.status(200).json({ sucesso: true })
     }
 
     if (req.method === 'DELETE') {

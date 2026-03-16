@@ -246,7 +246,7 @@ function gerarMsgWhatsApp(pedido) {
   return encodeURIComponent(linhas.join('\n'))
 }
 
-function CardPedido({ pedido, onImprimir, onExcluir, selecionado, onToggleSelecionado, infoImpressao }) {
+function CardPedido({ pedido, onImprimir, onExcluir, onConfirmarPix, selecionado, onToggleSelecionado, infoImpressao }) {
   const [expandido, setExpandido] = useState(false)
   const detalhesRef = useRef(null)
   const id = pedido.numeroPedido || pedido.id
@@ -314,6 +314,11 @@ function CardPedido({ pedido, onImprimir, onExcluir, selecionado, onToggleSeleci
               <span className={`text-xs px-1.5 py-0.5 rounded-full font-semibold ${corPagamento}`}>
                 {pedido.pagamento === 'Cartão de Débito' ? 'Déb' : pedido.pagamento === 'Cartão de Crédito' ? 'Créd' : pedido.pagamento}
               </span>
+              {pedido.pagamento === 'Pix' && (
+                pedido.pixConfirmado
+                  ? <span className="text-xs px-1.5 py-0.5 rounded-full font-semibold bg-green-900 text-green-300">✓ Pago</span>
+                  : <span className="text-xs px-1.5 py-0.5 rounded-full font-semibold bg-yellow-900 text-yellow-300 animate-pulse">⏳ Aguard.</span>
+              )}
               <span className={`text-xs px-1.5 py-0.5 rounded-full font-semibold ${corTipo}`}>
                 {pedido.tipoEntrega === 'Entrega' ? '🛵' : '🏠'}
               </span>
@@ -376,7 +381,21 @@ function CardPedido({ pedido, onImprimir, onExcluir, selecionado, onToggleSeleci
               )}
               <div>
                 <p className="text-gray-500 text-xs uppercase tracking-wide">Pagamento</p>
-                <p className="text-white text-sm">{pedido.pagamento}</p>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <p className="text-white text-sm">{pedido.pagamento}</p>
+                  {pedido.pagamento === 'Pix' && (
+                    pedido.pixConfirmado
+                      ? <span className="text-xs font-semibold text-green-400">
+                          ✅ Comprovante confirmado {pedido.pixConfirmadoEm ? `às ${new Date(pedido.pixConfirmadoEm).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}` : ''}
+                        </span>
+                      : <button
+                          onClick={() => onConfirmarPix(pedido)}
+                          className="text-xs font-bold px-3 py-1 rounded-lg bg-green-700 hover:bg-green-600 text-white transition"
+                        >
+                          ✅ Confirmar Pix
+                        </button>
+                  )}
+                </div>
               </div>
               {pedido.observacao && (
                 <div>
@@ -956,6 +975,18 @@ export default function Admin() {
     localStorage.setItem('scooby_impressos', JSON.stringify(novos))
   }
 
+  async function handleConfirmarPix(pedido) {
+    const res = await fetch(`/api/pedido?id=${pedido.id}`, { method: 'PATCH' })
+    if (res.ok) {
+      setPedidos(prev => prev.map(p => p.id === pedido.id
+        ? { ...p, pixConfirmado: true, pixConfirmadoEm: new Date().toISOString() }
+        : p
+      ))
+    } else {
+      alert('Erro ao confirmar Pix.')
+    }
+  }
+
   async function handleExcluirPedido(pedido) {
     const id = pedido.numeroPedido || pedido.id
     if (!window.confirm(`Excluir pedido ${id} de ${pedido.nomeCliente}?\n\nEsta ação não pode ser desfeita.`)) return
@@ -1379,6 +1410,7 @@ export default function Admin() {
                   pedido={p}
                   onImprimir={handleImprimir}
                   onExcluir={handleExcluirPedido}
+                  onConfirmarPix={handleConfirmarPix}
                   selecionado={selecionados.has(p.numeroPedido || p.id)}
                   onToggleSelecionado={toggleSelecionado}
                   infoImpressao={pedidosImpressos[p.numeroPedido || p.id] || null}
