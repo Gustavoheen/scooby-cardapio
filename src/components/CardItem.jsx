@@ -201,55 +201,80 @@ export function CardItem({ item, adicionar, lojaAberta = true, desativado = fals
 
   return (
     <>
-      <div className={`bg-scooby-card border rounded-2xl p-4 flex flex-col justify-between transition-all ${desativado ? 'border-gray-700 opacity-60' : 'border-scooby-borda hover:border-scooby-amarelo/40 hover:shadow-lg hover:shadow-black/30'}`}>
-        <div>
-          <div className="flex items-start justify-between gap-2 mb-1">
-            <h3 className="text-white font-bold text-base leading-tight">{item.nome}</h3>
+      <div className={`bg-scooby-card border rounded-2xl overflow-hidden flex flex-col transition-all ${desativado ? 'border-gray-700 opacity-60' : 'border-scooby-borda hover:border-scooby-amarelo/40 hover:shadow-lg hover:shadow-black/30'}`}>
+
+        {/* Foto do produto */}
+        {item.imagem ? (
+          <div className="relative w-full" style={{ paddingBottom: '56.25%' /* 16:9 */ }}>
+            <img
+              src={item.imagem}
+              alt={item.nome}
+              loading="lazy"
+              className="absolute inset-0 w-full h-full object-cover"
+            />
             {desativado && (
-              <span className="flex-shrink-0 bg-gray-700 text-gray-400 text-xs font-semibold px-2 py-0.5 rounded-full">
-                Esgotado
-              </span>
+              <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                <span className="bg-gray-800 text-gray-300 text-xs font-semibold px-3 py-1 rounded-full border border-gray-600">
+                  Esgotado
+                </span>
+              </div>
             )}
           </div>
-          <p className="text-gray-400 text-xs leading-relaxed mb-1">{item.descricao}</p>
+        ) : (
+          <div className="w-full bg-gray-800/60" style={{ paddingBottom: '56.25%' }} />
+        )}
 
-          {temTamanhos && (
-            <div className="flex gap-2 mb-3 flex-wrap">
-              {item.tamanhos.map(t => (
-                <span key={t.label} className="text-xs bg-scooby-borda text-gray-300 px-2.5 py-1 rounded-full">
-                  {t.label}: R$ {t.preco.toFixed(2).replace('.', ',')}
+        {/* Conteúdo do card */}
+        <div className="p-4 flex flex-col flex-1 justify-between">
+          <div>
+            <div className="flex items-start justify-between gap-2 mb-1">
+              <h3 className="text-white font-bold text-base leading-tight">{item.nome}</h3>
+              {desativado && !item.imagem && (
+                <span className="flex-shrink-0 bg-gray-700 text-gray-400 text-xs font-semibold px-2 py-0.5 rounded-full">
+                  Esgotado
                 </span>
-              ))}
+              )}
             </div>
-          )}
+            <p className="text-gray-400 text-xs leading-relaxed mb-1">{item.descricao}</p>
 
-          {temProteinas && (
-            <div className="flex gap-1 mb-3 flex-wrap">
-              {item.proteinas.map(p => (
-                <span key={p.label} className="text-xs bg-scooby-borda text-gray-300 px-2.5 py-1 rounded-full">
-                  {p.label}
-                </span>
-              ))}
-            </div>
-          )}
-        </div>
+            {temTamanhos && (
+              <div className="flex gap-2 mb-3 flex-wrap">
+                {item.tamanhos.map(t => (
+                  <span key={t.label} className="text-xs bg-scooby-borda text-gray-300 px-2.5 py-1 rounded-full">
+                    {t.label}: R$ {t.preco.toFixed(2).replace('.', ',')}
+                  </span>
+                ))}
+              </div>
+            )}
 
-        <div className="flex items-center justify-between mt-3 pt-3 border-t border-scooby-borda">
-          <span className={`font-black text-base ${desativado ? 'text-gray-500' : 'text-scooby-amarelo'}`}>{precoExibido}</span>
-          <button
-            onClick={(!lojaAberta || desativado) ? undefined : handleAdicionar}
-            disabled={!lojaAberta || desativado}
-            className={`flex items-center gap-1.5 font-bold text-sm px-4 py-2 rounded-xl transition active:scale-95 ${
-              desativado
-                ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
-                : lojaAberta
-                  ? 'bg-scooby-vermelho hover:bg-red-700 text-white cursor-pointer'
-                  : 'bg-scooby-borda text-gray-500 cursor-not-allowed'
-            }`}
-          >
-            <span className="text-lg leading-none">+</span>
-            {desativado ? 'Esgotado' : lojaAberta ? 'Adicionar' : 'Fechado'}
-          </button>
+            {temProteinas && (
+              <div className="flex gap-1 mb-3 flex-wrap">
+                {item.proteinas.map(p => (
+                  <span key={p.label} className="text-xs bg-scooby-borda text-gray-300 px-2.5 py-1 rounded-full">
+                    {p.label}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="flex items-center justify-between mt-3 pt-3 border-t border-scooby-borda">
+            <span className={`font-black text-base ${desativado ? 'text-gray-500' : 'text-scooby-amarelo'}`}>{precoExibido}</span>
+            <button
+              onClick={(!lojaAberta || desativado) ? undefined : handleAdicionar}
+              disabled={!lojaAberta || desativado}
+              className={`flex items-center gap-1.5 font-bold text-sm px-4 py-2 rounded-xl transition active:scale-95 ${
+                desativado
+                  ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
+                  : lojaAberta
+                    ? 'bg-scooby-vermelho hover:bg-red-700 text-white cursor-pointer'
+                    : 'bg-scooby-borda text-gray-500 cursor-not-allowed'
+              }`}
+            >
+              <span className="text-lg leading-none">+</span>
+              {desativado ? 'Esgotado' : lojaAberta ? 'Adicionar' : 'Fechado'}
+            </button>
+          </div>
         </div>
       </div>
 

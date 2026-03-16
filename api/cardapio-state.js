@@ -56,9 +56,15 @@ module.exports = async function handler(req, res) {
       if (pixNome !== undefined) estado.pixNome = pixNome
       if (bloqueados !== undefined) estado.bloqueados = bloqueados
 
-      const { error } = await supabase
-        .from('store_state')
-        .upsert(estado)
+      let { error } = await supabase.from('store_state').upsert(estado)
+
+      // PGRST204 = coluna não existe no schema ainda (migração pendente).
+      // Remove os campos novos e tenta de novo para não quebrar o restante.
+      if (error?.code === 'PGRST204') {
+        const { whatsappNumero: _w, pixChave: _pk, pixTipo: _pt, pixNome: _pn, bloqueados: _b, ...estadoBase } = estado
+        const r2 = await supabase.from('store_state').upsert(estadoBase)
+        error = r2.error
+      }
       if (error) throw error
       return res.status(200).json({ sucesso: true })
     }

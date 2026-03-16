@@ -23,10 +23,27 @@ CREATE TABLE IF NOT EXISTS store_state (
   "lojaStatus" text,
   "horarioAbertura" text,
   "horarioFechamento" text,
-  "atualizadoEm" timestamptz DEFAULT now()
+  "atualizadoEm" timestamptz DEFAULT now(),
+  -- Colunas adicionadas após deploy inicial (rodar migration abaixo se não existirem)
+  "whatsappNumero" text,
+  "pixChave" text,
+  "pixTipo" text,
+  "pixNome" text,
+  bloqueados jsonb DEFAULT '[]'
 );
 
 INSERT INTO store_state (id) VALUES (1) ON CONFLICT (id) DO NOTHING;
+
+-- ============================================================
+-- MIGRATION — rodar no SQL Editor do Supabase se as colunas
+-- ainda não existirem:
+-- ============================================================
+-- ALTER TABLE store_state
+--   ADD COLUMN IF NOT EXISTS "whatsappNumero" text,
+--   ADD COLUMN IF NOT EXISTS "pixChave" text,
+--   ADD COLUMN IF NOT EXISTS "pixTipo" text,
+--   ADD COLUMN IF NOT EXISTS "pixNome" text,
+--   ADD COLUMN IF NOT EXISTS bloqueados jsonb DEFAULT '[]';
 
 -- Clientes do cardápio (histórico de pedidos / endereços salvos)
 CREATE TABLE IF NOT EXISTS clients (
