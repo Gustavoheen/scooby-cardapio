@@ -193,7 +193,7 @@ export default function App() {
                 ⏰ {cardapioState.horarioAbertura || CONFIG.horarioAbertura} – {cardapioState.horarioFechamento || CONFIG.horarioFechamento}
               </span>
               <span className="bg-scooby-card border border-scooby-borda text-gray-300 text-xs px-3 py-1.5 rounded-full">
-                🚗 Entrega R$ {CONFIG.taxaEntrega.toFixed(2).replace('.', ',')}
+                🚗 Entrega R$ {taxaEntrega.toFixed(2).replace('.', ',')}
               </span>
               <span className="bg-scooby-card border border-scooby-borda text-gray-300 text-xs px-3 py-1.5 rounded-full">
                 ⏱ {tempoEntrega}
@@ -376,6 +376,10 @@ export default function App() {
           taxaEntrega={taxaEntrega}
           cupons={cardapioState.cupons || []}
           tempoEntrega={tempoEntrega}
+          pixChave={cardapioState.pixChave}
+          pixTipo={cardapioState.pixTipo}
+          pixNome={cardapioState.pixNome}
+          whatsappNumero={cardapioState.whatsappNumero}
         />
       )}
 

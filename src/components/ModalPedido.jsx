@@ -39,11 +39,15 @@ function formatarMensagemWhatsApp(dados, itens, subtotal, taxaEntrega, desconto,
 }
 
 // Tela do Pix
-function TelaPix({ total, onConfirmar }) {
+function TelaPix({ total, onConfirmar, pixChave, pixTipo, pixNome }) {
   const [copiado, setCopiado] = useState(false)
 
+  const chave = pixChave || CONFIG.pixChave
+  const tipo  = pixTipo  || CONFIG.pixTipo
+  const nome  = pixNome  || CONFIG.pixNome
+
   function copiarChave() {
-    navigator.clipboard.writeText(CONFIG.pixChave)
+    navigator.clipboard.writeText(chave)
     setCopiado(true)
     setTimeout(() => setCopiado(false), 3000)
   }
@@ -57,15 +61,15 @@ function TelaPix({ total, onConfirmar }) {
         <div className="bg-scooby-card rounded-xl p-4 space-y-2">
           <div>
             <p className="text-gray-400 text-xs uppercase tracking-wide">Tipo de chave</p>
-            <p className="text-white font-semibold">{CONFIG.pixTipo}</p>
+            <p className="text-white font-semibold">{tipo}</p>
           </div>
           <div>
             <p className="text-gray-400 text-xs uppercase tracking-wide">Chave Pix</p>
-            <p className="text-scooby-amarelo font-bold text-lg">{CONFIG.pixChave}</p>
+            <p className="text-scooby-amarelo font-bold text-lg">{chave}</p>
           </div>
           <div>
             <p className="text-gray-400 text-xs uppercase tracking-wide">Favorecido</p>
-            <p className="text-white font-semibold">{CONFIG.pixNome}</p>
+            <p className="text-white font-semibold">{nome}</p>
           </div>
           <div className="pt-2 border-t border-scooby-borda">
             <p className="text-gray-400 text-xs uppercase tracking-wide">Valor a pagar</p>
@@ -165,7 +169,7 @@ async function salvarClienteAPI(dados, enderecoAnterior) {
 
 const ENDERECO_VAZIO = { rua: '', numero: '', complemento: '', bairro: '' }
 
-export function ModalPedido({ itens, subtotal, onFechar, onConcluir, taxaEntrega = CONFIG.taxaEntrega, cupons = [], tempoEntrega = CONFIG.tempoEntrega }) {
+export function ModalPedido({ itens, subtotal, onFechar, onConcluir, taxaEntrega = CONFIG.taxaEntrega, cupons = [], tempoEntrega = CONFIG.tempoEntrega, pixChave, pixTipo, pixNome, whatsappNumero }) {
   const [etapa, setEtapa] = useState('form') // 'form' | 'pix'
   const [clienteRecuperado, setClienteRecuperado] = useState(null) // nome do cliente encontrado
   const [enderecosSalvos, setEnderecosSalvos] = useState([])       // lista de endereços salvos
@@ -283,7 +287,7 @@ export function ModalPedido({ itens, subtotal, onFechar, onConcluir, taxaEntrega
 
   function enviarWhatsApp() {
     const msg = formatarMensagemWhatsApp(dados, itens, subtotal, taxaEntrega, desconto, cupomAplicado, tempoEntrega)
-    window.location.href = `whatsapp://send?phone=${CONFIG.whatsappNumero}&text=${msg}`
+    window.location.href = `whatsapp://send?phone=${whatsappNumero || CONFIG.whatsappNumero}&text=${msg}`
     salvarPedido(dados, itens, subtotal, taxaEntrega, desconto, cupomAplicado)
     salvarClienteAPI(dados)
     onConcluir()
@@ -572,6 +576,9 @@ export function ModalPedido({ itens, subtotal, onFechar, onConcluir, taxaEntrega
             <TelaPix
               total={totalComDesconto}
               onConfirmar={enviarWhatsApp}
+              pixChave={pixChave}
+              pixTipo={pixTipo}
+              pixNome={pixNome}
             />
           )}
         </div>
