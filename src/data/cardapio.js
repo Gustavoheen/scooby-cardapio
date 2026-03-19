@@ -16,6 +16,7 @@ export const ADICIONAIS = [
   { id: 'add-presunto',    nome: 'Presunto',      preco:  4.00, emoji: '🍖' },
   { id: 'add-queijo',      nome: 'Queijo',        preco:  6.00, emoji: '🧀' },
   { id: 'add-ovo',         nome: 'Ovo',           preco:  4.00, emoji: '🍳' },
+  { id: 'add-maionese',   nome: 'Maionese Temperada', preco: 1.50, emoji: '🥣' },
 ]
 
 export const categorias = [
@@ -204,9 +205,9 @@ export const categorias = [
     nome: '🌭 Pão com Linguiça',
     emoji: '🌭',
     itens: [
-      { id: 301, nome: 'Pão com Linguiça Simples',     descricao: 'Pão, linguiça, mussarela e salada',                              imagem: BASE + 'SKU035_PAO_LINGUICA_SIMPLES.jpg',      preco: 19.00 },
-      { id: 302, nome: 'Pão com Linguiça Tradicional', descricao: 'Pão, linguiça, mussarela, bacon e salada',                       imagem: BASE + 'SKU036_PAO_LINGUICA_TRADICIONAL.jpg',  preco: 24.00 },
-      { id: 303, nome: 'Pão com Linguiça da Casa',     descricao: 'Pão, linguiça, mussarela, bacon, ovo, catupiry e salada',        imagem: BASE + 'SKU037_PAO_LINGUICA_DA_CASA.jpg',      preco: 29.00 },
+      { id: 301, nome: 'Pão com Linguiça Simples',     descricao: 'Pão, linguiça, mussarela e salada',                              imagem: BASE + 'SKU035_PAO_LINGUICA_SIMPLES.png',      preco: 19.00 },
+      { id: 302, nome: 'Pão com Linguiça Tradicional', descricao: 'Pão, linguiça, mussarela, bacon e salada',                       imagem: BASE + 'SKU036_PAO_LINGUICA_TRADICIONAL.png',  preco: 24.00 },
+      { id: 303, nome: 'Pão com Linguiça da Casa',     descricao: 'Pão, linguiça, mussarela, bacon, ovo, catupiry e salada',        imagem: BASE + 'SKU037_PAO_LINGUICA_DA_CASA.png',      preco: 29.00 },
     ]
   },
 
@@ -261,6 +262,7 @@ export const categorias = [
       { id: 604, nome: 'Meia Porção de Contra Filé',        descricao: '300g de batata frita, 200g de contra filé, queijo e bacon',              imagem: BASE + 'SKU046_MEIA_PORCAO_CONTRA_FILE.jpg',       preco: 70.00 },
       { id: 605, nome: 'Porção de Pernil Inteira',          descricao: '500g de batata frita, 400g de pernil, queijo e bacon',                   imagem: BASE + 'SKU047_PORCAO_PERNIL_INTEIRA.jpg',         preco: 80.00 },
       { id: 606, nome: 'Meia Porção de Pernil',             descricao: '300g de batata frita, 200g de pernil, queijo e bacon',                   imagem: BASE + 'SKU048_MEIA_PORCAO_PERNIL.jpg',            preco: 60.00 },
+      { id: 607, nome: 'Porção Mista',                      descricao: '600g de batata frita, 300g de contrafilé, 300g de pernil, queijo e bacon', imagem: BASE + 'SKU066_PORCAO_MISTA.png',                preco: 120.00 },
     ]
   },
 
