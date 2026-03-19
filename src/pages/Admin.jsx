@@ -646,7 +646,7 @@ export default function Admin() {
           novos.forEach(p => {
             const id = p.numeroPedido || p.id
             pedidosVistosRef.current.add(id)
-            handleImprimir(p, 'auto')
+            handleImprimirRef.current?.(p, 'auto')
           })
           if (novos.length > 0) {
             localStorage.setItem('scooby_vistos', JSON.stringify([...pedidosVistosRef.current]))
@@ -921,7 +921,18 @@ export default function Admin() {
   }
 
   async function imprimirEscPos(pedido) {
-    if (!qz.websocket.isActive()) { imprimirPedido(pedido); return }
+    // Se WebSocket caiu, tenta reconectar antes de imprimir
+    if (!qz.websocket.isActive()) {
+      try {
+        await qz.websocket.connect()
+        setImpressoraConectada(true)
+      } catch {
+        // QZ Tray não está rodando — fallback para janela do browser
+        // (só funciona se chamado por clique do usuário, não por timer)
+        imprimirPedido(pedido)
+        return
+      }
+    }
     try {
       let impressora = nomeImpressora
       try { await qz.printers.find(impressora) } catch { impressora = await qz.printers.getDefault() }
@@ -951,6 +962,9 @@ export default function Admin() {
   )
   const autoPrintRef = useRef(autoPrint)
   const isFirstFetchRef = useRef(true)
+  // handleImprimirRef: sempre aponta para a versão mais recente de handleImprimir,
+  // resolvendo o stale closure do useCallback([]) em buscarPedidos
+  const handleImprimirRef = useRef(null)
 
   // Seleção para impressão em lote
   const [selecionados, setSelecionados] = useState(new Set())
@@ -964,16 +978,22 @@ export default function Admin() {
     localStorage.setItem('scooby_autoprint', String(novo))
   }
 
-  function handleImprimir(pedido, tipo = 'manual') {
-    imprimirEscPos(pedido)
+  async function handleImprimir(pedido, tipo = 'manual') {
     const id = pedido.numeroPedido || pedido.id
     if (!id) return
+    try {
+      await imprimirEscPos(pedido)
+    } catch {
+      // erro já logado dentro de imprimirEscPos
+    }
     const hora = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
     const novos = { ...pedidosImpressosRef.current, [id]: { hora, tipo } }
     pedidosImpressosRef.current = novos
     setPedidosImpressos(novos)
     localStorage.setItem('scooby_impressos', JSON.stringify(novos))
   }
+  // Mantém a ref atualizada com a versão mais recente do handleImprimir (todo render)
+  handleImprimirRef.current = handleImprimir
 
   async function handleConfirmarPix(pedido) {
     const res = await fetch(`/api/pedido?id=${pedido.id}`, { method: 'PATCH' })
