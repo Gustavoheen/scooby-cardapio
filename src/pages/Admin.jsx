@@ -948,9 +948,11 @@ export default function Admin() {
   }
 
   // ── Auto-print ────────────────────────────────────────────────
-  const [autoPrint, setAutoPrint] = useState(
-    localStorage.getItem('scooby_autoprint') === 'true'
-  )
+  // Padrão true: em nova instalação/PC/PWA, auto-impressão já vem ligada
+  const [autoPrint, setAutoPrint] = useState(() => {
+    const salvo = localStorage.getItem('scooby_autoprint')
+    return salvo === null ? true : salvo === 'true'
+  })
   // pedidosImpressos: { [id]: { hora, tipo: 'auto'|'manual' } } — registros de impressão
   const [pedidosImpressos, setPedidosImpressos] = useState(
     () => JSON.parse(localStorage.getItem('scooby_impressos') || '{}')
@@ -1356,13 +1358,21 @@ export default function Admin() {
                 onClick={toggleAutoPrint}
                 className={`flex items-center gap-2 font-semibold text-sm px-4 py-2 rounded-xl border-2 transition ${
                   autoPrint
-                    ? 'bg-green-700 border-green-500 text-white hover:bg-green-600'
+                    ? impressoraConectada
+                      ? 'bg-green-700 border-green-500 text-white hover:bg-green-600'
+                      : 'bg-yellow-700 border-yellow-500 text-white hover:bg-yellow-600 animate-pulse'
                     : 'bg-gray-800 border-gray-600 text-gray-400 hover:text-white'
                 }`}
-                title={autoPrint ? 'Auto-impressão ligada (clique para desligar)' : 'Auto-impressão desligada (clique para ligar)'}
+                title={
+                  autoPrint
+                    ? impressoraConectada
+                      ? 'Auto-impressão ligada (clique para desligar)'
+                      : '⚠️ Auto-impressão ligada mas impressora desconectada — vá em Configurações e clique Conectar USB'
+                    : 'Auto-impressão desligada (clique para ligar)'
+                }
               >
-                <span className={`w-2 h-2 rounded-full ${autoPrint ? 'bg-green-300 animate-pulse' : 'bg-gray-500'}`}></span>
-                🖨️ Auto {autoPrint ? 'ON' : 'OFF'}
+                <span className={`w-2 h-2 rounded-full ${autoPrint ? impressoraConectada ? 'bg-green-300 animate-pulse' : 'bg-yellow-300 animate-pulse' : 'bg-gray-500'}`}></span>
+                🖨️ Auto {autoPrint ? (impressoraConectada ? 'ON ✓' : 'ON ⚠️') : 'OFF'}
               </button>
               <button
                 onClick={buscarPedidos}
