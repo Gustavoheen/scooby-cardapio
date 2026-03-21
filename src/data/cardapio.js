@@ -289,6 +289,10 @@ export const categorias = [
       { id: 715, nome: 'Del Valle Uva Lata',   descricao: 'Suco Del Valle sabor Uva lata',           imagem: BASE + 'SKU063_DEL_VALLE_UVA_LATA.jpg',    preco:  6.00 },
       { id: 716, nome: 'Água s/ Gás',          descricao: 'Água mineral sem gás',                    imagem: BASE + 'SKU064_AGUA_SEM_GAS.jpg',          preco:  3.50 },
       { id: 717, nome: 'Água c/ Gás',          descricao: 'Água mineral com gás',                    imagem: BASE + 'SKU065_AGUA_COM_GAS.jpg',          preco:  4.00 },
+      { id: 718, nome: 'Refrigerante Mini',    descricao: 'Refrigerante mini 237ml',                 imagem: '',                                         preco:  3.00 },
+      { id: 719, nome: 'Coca-Cola Mini',       descricao: 'Coca-Cola mini 237ml',                    imagem: '',                                         preco:  3.00 },
+      { id: 720, nome: 'Fanta Mini',           descricao: 'Fanta mini 237ml',                        imagem: '',                                         preco:  3.00 },
+      { id: 721, nome: 'Guaraná Mini',         descricao: 'Guaraná mini 237ml',                      imagem: '',                                         preco:  3.00 },
     ]
   },
 ]

@@ -18,6 +18,40 @@ module.exports = async function handler(req, res) {
 
   try {
     if (req.method === 'GET') {
+      // Nunca cachear — admin precisa de dados em tempo real
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate')
+      res.setHeader('Pragma', 'no-cache')
+
+      const { telefone } = req.query
+
+      // Rota pública: busca por telefone (para acompanhamento do cliente)
+      if (telefone) {
+        const tel = telefone.replace(/\D/g, '')
+        const { data, error } = await supabase
+          .from('orders')
+          .select('id, data, criadoEm')
+          .filter('data->>telefone', 'eq', tel)
+          .order('id', { ascending: false })
+          .limit(5)
+        if (error) throw error
+        const pedidos = (data || []).map(r => ({
+          id: r.id,
+          criadoEm: r.criadoEm,
+          numeroPedido: r.data.numeroPedido,
+          nomeCliente: r.data.nomeCliente,
+          itensPedido: r.data.itensPedido,
+          total: r.data.total,
+          pagamento: r.data.pagamento,
+          tipoEntrega: r.data.tipoEntrega,
+          data: r.data.data,
+          hora: r.data.hora,
+          status: r.data.status || 'recebido',
+          statusAtualizadoEm: r.data.statusAtualizadoEm || null,
+        }))
+        return res.status(200).json(pedidos)
+      }
+
+      // Rota admin: retorna todos os pedidos
       const { data, error } = await supabase
         .from('orders')
         .select('id, data, criadoEm')
@@ -88,12 +122,20 @@ module.exports = async function handler(req, res) {
     }
 
     if (req.method === 'PATCH') {
-      // Confirmar pagamento Pix
       const { id } = req.query
       if (!id) return res.status(400).json({ erro: 'Informe o id do pedido' })
       const { data: row, error: fetchErr } = await supabase.from('orders').select('data').eq('id', id).single()
       if (fetchErr) throw fetchErr
-      const novaData = { ...row.data, pixConfirmado: true, pixConfirmadoEm: new Date().toISOString() }
+      const updates = {}
+      if (req.body?.status !== undefined) {
+        updates.status = req.body.status
+        updates.statusAtualizadoEm = new Date().toISOString()
+      } else {
+        // Compatibilidade: PATCH sem body = confirmar Pix
+        updates.pixConfirmado = true
+        updates.pixConfirmadoEm = new Date().toISOString()
+      }
+      const novaData = { ...row.data, ...updates }
       const { error: updateErr } = await supabase.from('orders').update({ data: novaData }).eq('id', id)
       if (updateErr) throw updateErr
       return res.status(200).json({ sucesso: true })

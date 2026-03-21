@@ -1,5 +1,71 @@
 import { useState, useEffect, useRef } from 'react'
+
+function BannerCupom({ cupons }) {
+  const agora = Date.now()
+  const cupom = (cupons || []).find(c =>
+    c.ativo && c.codigo &&
+    (!c.validadeAte || new Date(c.validadeAte).getTime() > agora)
+  )
+
+  const [tempo, setTempo] = useState('')
+
+  useEffect(() => {
+    if (!cupom?.validadeAte) { setTempo(''); return }
+    function atualizar() {
+      const diff = new Date(cupom.validadeAte).getTime() - Date.now()
+      if (diff <= 0) { setTempo('Expirado'); return }
+      const h = Math.floor(diff / 3600000)
+      const m = Math.floor((diff % 3600000) / 60000)
+      const s = Math.floor((diff % 60000) / 1000)
+      setTempo(`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`)
+    }
+    atualizar()
+    const id = setInterval(atualizar, 1000)
+    return () => clearInterval(id)
+  }, [cupom?.validadeAte])
+
+  if (!cupom) return null
+
+  const desconto = cupom.tipo === 'percentual'
+    ? `${cupom.valor}% de desconto`
+    : `R$ ${Number(cupom.valor).toFixed(2).replace('.', ',')} de desconto`
+
+  return (
+    <div className="bg-gradient-to-r from-emerald-900 via-green-800 to-emerald-900 border-b border-emerald-600/60 px-4 py-3">
+      <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-center gap-3 text-center">
+        <div className="flex items-center gap-2">
+          <span className="text-2xl animate-bounce">🎟</span>
+          <div>
+            <p className="text-white font-black text-sm sm:text-base">
+              Oferta especial! <span className="text-scooby-amarelo">{desconto}</span>
+            </p>
+            <p className="text-emerald-300 text-xs">
+              Use o código{' '}
+              <span className="font-mono font-black text-white bg-emerald-700 px-2 py-0.5 rounded tracking-widest">{cupom.codigo}</span>
+              {' '}na hora de pedir
+            </p>
+          </div>
+        </div>
+        {tempo && tempo !== 'Expirado' && (
+          <div className="flex items-center gap-2 bg-black/30 px-3 py-1.5 rounded-xl">
+            <span className="text-emerald-400 text-xs font-semibold">⏱ Acaba em</span>
+            <span className="text-white font-black text-lg font-mono tracking-widest">{tempo}</span>
+          </div>
+        )}
+        {tempo === 'Expirado' && (
+          <span className="text-red-400 text-xs font-semibold">Cupom expirado</span>
+        )}
+        {!cupom.validadeAte && (
+          <span className="text-emerald-400 text-xs font-semibold italic">Por tempo limitado!</span>
+        )}
+      </div>
+    </div>
+  )
+}
+
 import Admin from './pages/Admin'
+import AcompanharPedido from './pages/AcompanharPedido'
+import Garcom from './pages/Garcom'
 import { categorias, ADICIONAIS } from './data/cardapio'
 import { useCarrinho } from './hooks/useCarrinho'
 import { CardItem } from './components/CardItem'
@@ -9,6 +75,7 @@ import { ModalPedido } from './components/ModalPedido'
 import { CONFIG } from './config'
 
 function calcLojaAberta(state) {
+  if (import.meta.env.DEV || window.location.hostname.endsWith('vercel.app')) return true
   const status = state.lojaStatus
   if (status === 'aberta') return true
   if (status === 'fechada') return false
@@ -21,11 +88,15 @@ function calcLojaAberta(state) {
   const minAgora  = agora.getHours() * 60 + agora.getMinutes()
   const minAbertu = hA * 60 + mA
   const minFecha  = hF * 60 + mF
+  const diasPermitidos = state.diasFuncionamento ?? [0,1,2,3,4,5,6]
+  if (!diasPermitidos.includes(agora.getDay())) return false
   return minAgora >= minAbertu && minAgora < minFecha
 }
 
 export default function App() {
   if (window.location.pathname === '/admin') return <Admin />
+  if (window.location.pathname === '/acompanhar') return <AcompanharPedido />
+  if (window.location.pathname === '/garcom') return <Garcom />
 
   const [categoriaAtiva, setCategoriaAtiva] = useState(categorias[0].id)
   const [drawerAberto, setDrawerAberto] = useState(false)
@@ -40,6 +111,22 @@ export default function App() {
 
   useEffect(() => {
     fetch('/api/cardapio-state').then(r => r.json()).then(setCardapioState).catch(() => {})
+  }, [])
+
+  // Auto-atualização: verifica novo deploy a cada 60s e recarrega silenciosamente
+  useEffect(() => {
+    let versaoAtual = null
+    async function checarVersao() {
+      try {
+        const r = await fetch('/api/version')
+        const { version } = await r.json()
+        if (!versaoAtual) { versaoAtual = version; return }
+        if (version !== versaoAtual) window.location.reload()
+      } catch {}
+    }
+    checarVersao()
+    const id = setInterval(checarVersao, 60000)
+    return () => clearInterval(id)
   }, [])
 
   const taxaEntrega = cardapioState.taxaEntrega ?? CONFIG.taxaEntrega
@@ -107,6 +194,7 @@ export default function App() {
 
   const categoriaExibida = categorias.find(c => c.id === categoriaAtiva)
   const conteudoRef = useRef(null)
+  const scrollCategoriasRef = useRef(null)
 
   function handleCategoriaChange(catId) {
     setCategoriaAtiva(catId)
@@ -131,7 +219,7 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-scooby-escuro text-white relative">
+    <div className="min-h-[100dvh] bg-scooby-escuro text-white relative">
 
       {/* Watermark desktop — logo centralizada e transparente cobrindo a página toda */}
       <div
@@ -156,6 +244,9 @@ export default function App() {
           opacity: 0.08,
         }}
       />
+
+      {/* ── BANNER CUPOM ── */}
+      <BannerCupom cupons={cardapioState.cupons} />
 
       {/* ── HERO / HEADER ── */}
       <header className="relative z-10 border-b border-scooby-borda/50">
@@ -198,6 +289,12 @@ export default function App() {
               <span className="bg-scooby-card border border-scooby-borda text-gray-300 text-xs px-3 py-1.5 rounded-full">
                 ⏱ {tempoEntrega}
               </span>
+              <a
+                href="/acompanhar"
+                className="bg-blue-900/50 border border-blue-700 text-blue-300 hover:text-white hover:bg-blue-800 text-xs px-3 py-1.5 rounded-full transition font-semibold"
+              >
+                📍 Acompanhar pedido
+              </a>
             </div>
 
             {!lojaAberta && (
@@ -225,20 +322,39 @@ export default function App() {
       {/* ── ABAS DE CATEGORIA ── */}
       <div className="sticky top-0 z-30 bg-black/80 backdrop-blur border-b border-scooby-borda shadow-lg">
         <div className="max-w-7xl mx-auto px-3">
-          <div className="flex overflow-x-auto gap-1.5 py-2.5" style={{ scrollbarWidth: 'none' }}>
-            {categorias.map(cat => (
-              <button
-                key={cat.id}
-                onClick={() => handleCategoriaChange(cat.id)}
-                className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-semibold transition whitespace-nowrap ${
-                  categoriaAtiva === cat.id
-                    ? 'bg-scooby-amarelo text-black shadow'
-                    : 'text-gray-400 hover:text-white hover:bg-scooby-borda'
-                }`}
-              >
-                {cat.emoji} {cat.nome.split(' ').slice(1).join(' ')}
-              </button>
-            ))}
+          <div className="relative">
+            <div ref={scrollCategoriasRef} className="flex overflow-x-auto gap-1.5 py-2.5" style={{ scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' }}>
+              {categorias.map(cat => (
+                <button
+                  key={cat.id}
+                  onClick={() => handleCategoriaChange(cat.id)}
+                  className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-semibold transition whitespace-nowrap ${
+                    categoriaAtiva === cat.id
+                      ? 'bg-scooby-amarelo text-black shadow'
+                      : 'text-gray-400 hover:text-white hover:bg-scooby-borda'
+                  }`}
+                >
+                  {cat.emoji} {cat.nome.split(' ').slice(1).join(' ')}
+                </button>
+              ))}
+              <div className="flex-shrink-0 w-8" />
+            </div>
+            {/* Gradiente + seta clicável */}
+            <div
+              className="absolute right-0 top-0 h-full w-12 bg-gradient-to-l from-black/90 to-transparent cursor-pointer flex items-center justify-center"
+              onClick={() => {
+                const el = scrollCategoriasRef.current
+                if (!el) return
+                const novaPos = el.scrollLeft + el.clientWidth * 0.6
+                if (novaPos >= el.scrollWidth - el.clientWidth - 5) {
+                  el.scrollTo({ left: 0, behavior: 'smooth' })
+                } else {
+                  el.scrollTo({ left: novaPos, behavior: 'smooth' })
+                }
+              }}
+            >
+              <span className="text-scooby-vermelho font-bold text-lg animate-bounce-x">›</span>
+            </div>
           </div>
         </div>
       </div>
@@ -253,30 +369,22 @@ export default function App() {
               <span className="w-1 h-6 bg-scooby-vermelho rounded-full inline-block"></span>
               🎉 Promoções do Dia
             </h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+            <div className="flex flex-col gap-2">
               {combosAtivos.map(combo => {
                 const descricaoItens = combo.itens.map(it => `${it.quantidade}x ${it.label}`).join(' + ')
                 return (
-                  <div key={combo.id} className="bg-scooby-card border-2 border-scooby-vermelho rounded-2xl p-4 flex flex-col justify-between relative overflow-hidden hover:border-scooby-amarelo transition-all hover:shadow-lg hover:shadow-black/30">
-                    <div className="absolute top-3 right-3">
-                      <span className="bg-scooby-vermelho text-white text-xs font-bold px-2 py-0.5 rounded-full animate-pulse">PROMOÇÃO</span>
+                  <div key={combo.id} className="bg-scooby-card border border-scooby-vermelho/60 rounded-xl px-3 py-2.5 flex items-center gap-3 hover:border-scooby-amarelo transition-all">
+                    <span className="text-xl flex-shrink-0">🎉</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-white font-bold text-sm leading-tight">{combo.nome}</p>
+                      <p className="text-gray-500 text-xs truncate">{descricaoItens}{combo.descricao ? ` · ${combo.descricao}` : ''}</p>
                     </div>
-                    <div>
-                      <h3 className="text-white font-bold text-base leading-tight pr-20">{combo.nome}</h3>
-                      <p className="text-gray-400 text-xs mt-1 leading-relaxed">{descricaoItens}</p>
-                      {combo.descricao && <p className="text-green-400 text-xs font-semibold mt-1">🎉 {combo.descricao}</p>}
-                    </div>
-                    <div className="flex items-center justify-between mt-3 pt-3 border-t border-scooby-borda">
-                      <span className="text-green-400 font-black text-lg">R$ {Number(combo.precoCombo).toFixed(2).replace('.', ',')}</span>
-                      <button
-                        onClick={lojaAberta ? () => adicionarCombo(combo) : undefined}
-                        disabled={!lojaAberta}
-                        className={`flex items-center gap-1.5 font-bold text-sm px-4 py-2 rounded-xl transition active:scale-95 ${lojaAberta ? 'bg-scooby-vermelho hover:bg-red-700 text-white cursor-pointer' : 'bg-scooby-borda text-gray-500 cursor-not-allowed'}`}
-                      >
-                        <span className="text-lg leading-none">+</span>
-                        {lojaAberta ? 'Adicionar' : 'Fechado'}
-                      </button>
-                    </div>
+                    <span className="text-green-400 font-black text-sm flex-shrink-0">R$ {Number(combo.precoCombo).toFixed(2).replace('.', ',')}</span>
+                    <button
+                      onClick={lojaAberta ? () => adicionarCombo(combo) : undefined}
+                      disabled={!lojaAberta}
+                      className={`flex-shrink-0 w-9 h-9 rounded-xl font-bold text-xl flex items-center justify-center transition active:scale-90 ${lojaAberta ? 'bg-scooby-vermelho hover:bg-red-700 text-white' : 'bg-scooby-borda text-gray-500 cursor-not-allowed'}`}
+                    >+</button>
                   </div>
                 )
               })}
@@ -293,7 +401,7 @@ export default function App() {
               <span className="w-1 h-6 bg-scooby-amarelo rounded-full inline-block"></span>
               {categoriaExibida.nome}
             </h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
               {aplicarOverrides(categoriaExibida.itens).map(item => (
                 <CardItem
                   key={item.id}
@@ -330,7 +438,7 @@ export default function App() {
 
       {/* ── BOTÃO FLUTUANTE — mobile ── */}
       {totalItens > 0 && !drawerAberto && !modalAberto && lojaAberta && (
-        <div className="fixed bottom-5 left-0 right-0 z-30 flex justify-center px-4 lg:hidden">
+        <div className="fixed bottom-[env(safe-area-inset-bottom,20px)] left-0 right-0 z-30 flex justify-center px-4 lg:hidden" style={{ bottom: 'max(20px, env(safe-area-inset-bottom))' }}>
           <button
             onClick={() => setDrawerAberto(true)}
             className="w-full max-w-sm bg-scooby-vermelho hover:bg-red-700 text-white font-bold py-4 px-6 rounded-2xl shadow-2xl flex items-center justify-between transition active:scale-95"
@@ -380,6 +488,8 @@ export default function App() {
           pixTipo={cardapioState.pixTipo}
           pixNome={cardapioState.pixNome}
           whatsappNumero={cardapioState.whatsappNumero}
+          adicionar={adicionar}
+          remover={remover}
         />
       )}
 

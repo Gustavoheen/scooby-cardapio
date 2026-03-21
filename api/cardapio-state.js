@@ -32,7 +32,7 @@ module.exports = async function handler(req, res) {
         precos = {}, desativados = [], precosVariacoes = {},
         taxaEntrega, tempoEntrega, promocoes, cupons,
         senhaCliente, lojaStatus, horarioAbertura, horarioFechamento,
-        whatsappNumero, pixChave, pixTipo, pixNome, bloqueados,
+        whatsappNumero, pixChave, pixTipo, pixNome, bloqueados, diasFuncionamento, senhaGarcom,
       } = req.body
 
       const estado = {
@@ -55,15 +55,35 @@ module.exports = async function handler(req, res) {
       if (pixTipo !== undefined) estado.pixTipo = pixTipo
       if (pixNome !== undefined) estado.pixNome = pixNome
       if (bloqueados !== undefined) estado.bloqueados = bloqueados
+      if (diasFuncionamento !== undefined) estado.diasFuncionamento = diasFuncionamento
+      if (senhaGarcom !== undefined) estado.senhaGarcom = senhaGarcom
 
       let { error } = await supabase.from('store_state').upsert(estado)
 
-      // PGRST204 = coluna não existe no schema ainda (migração pendente).
-      // Remove os campos novos e tenta de novo para não quebrar o restante.
+      // PGRST204 = coluna não existe no schema do Supabase ainda.
+      // Tenta progressivamente removendo campos mais novos até salvar o que for possível.
       if (error?.code === 'PGRST204') {
-        const { whatsappNumero: _w, pixChave: _pk, pixTipo: _pt, pixNome: _pn, bloqueados: _b, ...estadoBase } = estado
-        const r2 = await supabase.from('store_state').upsert(estadoBase)
-        error = r2.error
+        const camposOpcionais = [
+          'senhaGarcom', 'diasFuncionamento', 'bloqueados', 'whatsappNumero', 'pixChave', 'pixTipo', 'pixNome',
+          'cupons', 'promocoes', 'precosVariacoes', 'taxaEntrega', 'tempoEntrega',
+          'horarioAbertura', 'horarioFechamento', 'senhaCliente',
+        ]
+        let estadoTentativa = { ...estado }
+        let camposFalharam = []
+        for (const campo of camposOpcionais) {
+          if (!error || error.code !== 'PGRST204') break
+          camposFalharam.push(campo)
+          delete estadoTentativa[campo]
+          const retry = await supabase.from('store_state').upsert(estadoTentativa)
+          error = retry.error
+        }
+        if (!error && camposFalharam.length > 0) {
+          // Salvo parcialmente — retorna aviso com colunas faltando
+          return res.status(200).json({
+            sucesso: true,
+            aviso: `Colunas ausentes no banco: ${camposFalharam.join(', ')}. Execute a migração SQL para habilitar todos os recursos.`,
+          })
+        }
       }
       if (error) throw error
       return res.status(200).json({ sucesso: true })
