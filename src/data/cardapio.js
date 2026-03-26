@@ -17,6 +17,7 @@ export const ADICIONAIS = [
   { id: 'add-queijo',      nome: 'Queijo',        preco:  6.00, emoji: '🧀' },
   { id: 'add-ovo',         nome: 'Ovo',           preco:  4.00, emoji: '🍳' },
   { id: 'add-maionese',   nome: 'Maionese Temperada', preco: 1.50, emoji: '🥣' },
+  { id: 'add-milho',      nome: 'Milho',              preco: 3.00, emoji: '🌽' },
 ]
 
 export const categorias = [

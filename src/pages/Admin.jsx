@@ -1155,11 +1155,9 @@ export default function Admin() {
   }
 
   // ── Auto-print ────────────────────────────────────────────────
-  // Padrão true: em nova instalação/PC/PWA, auto-impressão já vem ligada
-  const [autoPrint, setAutoPrint] = useState(() => {
-    const salvo = localStorage.getItem('scooby_autoprint')
-    return salvo === null ? true : salvo === 'true'
-  })
+  // Sempre começa ligado ao abrir o painel (não depende de localStorage)
+  // O botão só desliga durante a sessão atual
+  const [autoPrint, setAutoPrint] = useState(true)
   // pedidosImpressos: { [id]: { hora, tipo: 'auto'|'manual' } } — registros de impressão
   const [pedidosImpressos, setPedidosImpressos] = useState(
     () => JSON.parse(localStorage.getItem('scooby_impressos') || '{}')
@@ -1206,9 +1204,24 @@ export default function Admin() {
   useEffect(() => { pedidosImpressosRef.current = pedidosImpressos }, [pedidosImpressos])
 
   function toggleAutoPrint() {
-    const novo = !autoPrint
-    setAutoPrint(novo)
-    localStorage.setItem('scooby_autoprint', String(novo))
+    setAutoPrint(novo => !novo)
+  }
+
+  // Toca um bipe duplo quando chega pedido novo
+  function tocarAlerta() {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)()
+      ;[0, 220].forEach(delay => {
+        const osc = ctx.createOscillator()
+        const gain = ctx.createGain()
+        osc.connect(gain); gain.connect(ctx.destination)
+        osc.frequency.value = 880
+        gain.gain.setValueAtTime(0.4, ctx.currentTime + delay / 1000)
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + delay / 1000 + 0.3)
+        osc.start(ctx.currentTime + delay / 1000)
+        osc.stop(ctx.currentTime + delay / 1000 + 0.3)
+      })
+    } catch {}
   }
 
   async function handleImprimir(pedido, tipo = 'manual') {
