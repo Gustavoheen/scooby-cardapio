@@ -71,6 +71,13 @@ export const categorias = [
         preco: 14.00,
       },
       {
+        id: 23,
+        nome: 'Brownie Supremo Kinder',
+        descricao: 'Brownie artesanal com creme de ninho, kinder bueno e calda de chocolate',
+        imagem: '/fotos/brownie-supremo-kinder.jpg',
+        preco: 16.00,
+      },
+      {
         id: 21,
         nome: 'Fatia Bombom de Oreo',
         descricao: 'Fatia de bolo de Oreo com creme de ninho, recheio de biscoito e cobertura de ganache',
@@ -149,13 +156,6 @@ export const categorias = [
         descricao: 'Brownie recheado com creme de ninho e nutella — irresistível!',
         imagem: '/fotos/sandubrownie.jpg',
         preco: 12.00,
-      },
-      {
-        id: 23,
-        nome: 'Brownie Supremo Kinder',
-        descricao: 'Brownie artesanal com creme de ninho, kinder bueno e calda de chocolate',
-        imagem: '/fotos/brownie-supremo-kinder.jpg',
-        preco: 16.00,
       },
       {
         id: 17,

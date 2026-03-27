@@ -22,7 +22,7 @@ module.exports = async function handler(req, res) {
       if (!telefone) return res.status(400).json({ erro: 'Informe o telefone' })
 
       const { data, error } = await supabase
-        .from('clients')
+        .from('thalia_clients')
         .select('*')
         .eq('telefone', telefone)
         .single()
@@ -36,7 +36,7 @@ module.exports = async function handler(req, res) {
       if (!telefone) return res.status(400).json({ erro: 'Informe o telefone' })
 
       const { error } = await supabase
-        .from('clients')
+        .from('thalia_clients')
         .upsert({
           telefone,
           nome,
@@ -53,7 +53,7 @@ module.exports = async function handler(req, res) {
       const { telefone, nome } = req.body
       if (!telefone) return res.status(400).json({ erro: 'Informe o telefone' })
       const { error } = await supabase
-        .from('clients')
+        .from('thalia_clients')
         .update({ nome, atualizadoEm: new Date().toISOString() })
         .eq('telefone', telefone)
       if (error) throw error
@@ -63,7 +63,7 @@ module.exports = async function handler(req, res) {
     if (req.method === 'DELETE') {
       const { telefone } = req.query
       if (!telefone) return res.status(400).json({ erro: 'Informe o telefone' })
-      const { error } = await supabase.from('clients').delete().eq('telefone', telefone)
+      const { error } = await supabase.from('thalia_clients').delete().eq('telefone', telefone)
       if (error) throw error
       return res.status(200).json({ sucesso: true })
     }
