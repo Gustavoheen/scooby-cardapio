@@ -17,7 +17,7 @@ function formatarMensagemWhatsApp(dados, itens, subtotal, taxaEntrega, desconto,
   }).join('\n')
 
   return encodeURIComponent(
-    `🍔 *NOVO PEDIDO — ${CONFIG.nomeLoja}*\n` +
+    `🍫 *NOVO PEDIDO — ${CONFIG.nomeLoja}*\n` +
     `${'─'.repeat(28)}\n` +
     `📅 *Data:* ${data}   🕐 *Hora:* ${hora}\n` +
     `${'─'.repeat(28)}\n\n` +
@@ -35,7 +35,7 @@ function formatarMensagemWhatsApp(dados, itens, subtotal, taxaEntrega, desconto,
     (dados.observacao ? `📝 *Obs:* ${dados.observacao}\n` : '') +
     (dados.tipoEntrega === 'entrega' ? `\n⏱ *Prazo de entrega:* ${tempoEntrega} a partir da confirmação do pedido.` : `\n⏱ *Prazo de retirada:* ${tempoEntrega} a partir da confirmação.`) +
     (dados.pagamento === 'Pix' ? `\n📎 *Envie o comprovante do Pix para confirmar seu pedido.*` : '') +
-    (dados.telefone ? `\n\n📍 *Acompanhe seu pedido:* https://www.scoobydoolanches.com.br/acompanhar?tel=${dados.telefone.replace(/\D/g, '')}` : '')
+    (dados.telefone ? `\n\n📍 *Acompanhe seu pedido:* https://thalia-doces.vercel.app/acompanhar?tel=${dados.telefone.replace(/\D/g, '')}` : '')
   )
 }
 
@@ -104,7 +104,7 @@ function TelaPix({ total, onConfirmar, pixChave, pixTipo, pixNome }) {
     <div className="space-y-4">
       {/* QR Code */}
       <div className="flex flex-col items-center gap-2">
-        <p className="text-gray-300 text-sm text-center">Escaneie o QR Code para pagar:</p>
+        <p className="text-gray-600 text-sm text-center">Escaneie o QR Code para pagar:</p>
         <div className="bg-white rounded-xl p-2 inline-block">
           <img src={qrUrl} alt="QR Code Pix" width={180} height={180} className="block" />
         </div>
@@ -116,7 +116,7 @@ function TelaPix({ total, onConfirmar, pixChave, pixTipo, pixNome }) {
       <div className="space-y-2">
         <p className="text-gray-400 text-xs text-center">Ou use o Pix copia e cola:</p>
         <div className="bg-scooby-escuro rounded-xl px-3 py-2 border border-scooby-borda">
-          <p className="text-gray-300 text-xs font-mono break-all leading-relaxed select-all">
+          <p className="text-gray-600 text-xs font-mono break-all leading-relaxed select-all">
             {pixPayload}
           </p>
         </div>
@@ -153,7 +153,7 @@ function TelaConfirmado({ dados, totalComDesconto, whatsAppUrl, numeroPedido, on
     <div className="space-y-5 text-center">
       <div className="text-7xl mt-2">✅</div>
       <div>
-        <h3 className="text-white font-bold text-xl mb-1">Pedido Confirmado!</h3>
+        <h3 className="text-gray-800 font-bold text-xl mb-1">Pedido Confirmado!</h3>
         <p className="text-gray-400 text-sm">Obrigado, {dados.nome.split(' ')[0]}! 🎉</p>
       </div>
 
@@ -172,7 +172,7 @@ function TelaConfirmado({ dados, totalComDesconto, whatsAppUrl, numeroPedido, on
         </div>
       ) : (
         <div className="bg-scooby-escuro rounded-2xl p-4 border border-scooby-borda">
-          <p className="text-gray-300 text-sm">
+          <p className="text-gray-600 text-sm">
             Acompanhe e confirme seu pedido pelo WhatsApp. 💬
           </p>
         </div>
@@ -230,12 +230,12 @@ function TelaResumo({ dados, itens, subtotal, taxaEntrega, desconto, cupomAplica
             {dados.tipoEntrega === 'entrega' ? '📍 Endereço de entrega' : '🏃 Retirada'}
           </p>
           {dados.tipoEntrega === 'entrega' ? (
-            <p className="text-white text-sm font-semibold leading-snug">
+            <p className="text-gray-800 text-sm font-semibold leading-snug">
               {dados.rua}, {dados.numero}
               {dados.complemento ? `, ${dados.complemento}` : ''} — {dados.bairro}
             </p>
           ) : (
-            <p className="text-white text-sm font-semibold">Retirar no local</p>
+            <p className="text-gray-800 text-sm font-semibold">Retirar no local</p>
           )}
           <p className="text-gray-500 text-xs mt-0.5">👤 {dados.nome} · {dados.telefone}</p>
         </div>
@@ -249,7 +249,7 @@ function TelaResumo({ dados, itens, subtotal, taxaEntrega, desconto, cupomAplica
       >
         <div>
           <p className="text-gray-500 text-xs uppercase tracking-wide mb-0.5">💳 Pagamento</p>
-          <p className="text-white text-sm font-semibold">
+          <p className="text-gray-800 text-sm font-semibold">
             {dados.pagamento}
             {dados.pagamento === 'Dinheiro' && dados.troco ? ` · Troco p/ R$ ${dados.troco}` : ''}
             {dados.pagamento === 'Dinheiro' && !dados.troco ? ' · Sem troco' : ''}
@@ -265,7 +265,7 @@ function TelaResumo({ dados, itens, subtotal, taxaEntrega, desconto, cupomAplica
           {itens.map((l, i) => (
             <div key={i} className="flex items-center gap-3 px-4 py-3">
               <div className="flex-1 min-w-0">
-                <p className="text-white text-sm font-semibold leading-snug">
+                <p className="text-gray-800 text-sm font-semibold leading-snug">
                   {l.item.nome}
                   {l.variacao && <span className="text-gray-500 font-normal text-xs"> ({l.variacao})</span>}
                 </p>
@@ -274,12 +274,12 @@ function TelaResumo({ dados, itens, subtotal, taxaEntrega, desconto, cupomAplica
               <div className="flex items-center gap-2 flex-shrink-0">
                 <button
                   onClick={() => remover(l.chave)}
-                  className="w-7 h-7 rounded-full bg-scooby-card border border-scooby-borda text-white font-bold text-lg leading-none flex items-center justify-center hover:border-scooby-vermelho hover:text-scooby-vermelho transition"
+                  className="w-7 h-7 rounded-full bg-scooby-card border border-scooby-borda text-gray-800 font-bold text-lg leading-none flex items-center justify-center hover:border-scooby-vermelho hover:text-scooby-vermelho transition"
                 >−</button>
-                <span className="text-white font-bold text-sm w-5 text-center">{l.qtd}</span>
+                <span className="text-gray-800 font-bold text-sm w-5 text-center">{l.qtd}</span>
                 <button
                   onClick={() => adicionar(l.item, l.variacao ? { label: l.variacao, preco: l.preco } : null)}
-                  className="w-7 h-7 rounded-full bg-scooby-card border border-scooby-borda text-white font-bold text-lg leading-none flex items-center justify-center hover:border-green-500 hover:text-green-400 transition"
+                  className="w-7 h-7 rounded-full bg-scooby-card border border-scooby-borda text-gray-800 font-bold text-lg leading-none flex items-center justify-center hover:border-green-500 hover:text-green-400 transition"
                 >+</button>
                 <span className="text-scooby-amarelo font-bold text-sm w-14 text-right">
                   R$ {(l.preco * l.qtd).toFixed(2).replace('.', ',')}
@@ -325,12 +325,9 @@ function TelaResumo({ dados, itens, subtotal, taxaEntrega, desconto, cupomAplica
           <span>R$ {subtotal.toFixed(2).replace('.', ',')}</span>
         </div>
         {dados.tipoEntrega === 'entrega' && (
-          <div className="flex justify-between text-sm">
-            <span className="text-gray-400">Taxa de entrega</span>
-            {taxaEntrega === 0
-              ? <span className="text-green-400 font-semibold">Grátis 🎉</span>
-              : <span className="text-gray-400">R$ {taxaEntrega.toFixed(2).replace('.', ',')}</span>
-            }
+          <div className="flex justify-between text-gray-400 text-sm">
+            <span>Taxa de entrega</span>
+            <span>R$ {taxaEntrega.toFixed(2).replace('.', ',')}</span>
           </div>
         )}
         {cupomAplicado && (
@@ -339,7 +336,7 @@ function TelaResumo({ dados, itens, subtotal, taxaEntrega, desconto, cupomAplica
             <span>- R$ {desconto.toFixed(2).replace('.', ',')}</span>
           </div>
         )}
-        <div className="flex justify-between font-bold text-white border-t border-scooby-borda pt-2">
+        <div className="flex justify-between font-bold text-gray-800 border-t border-scooby-borda pt-2">
           <span className="text-base">Total</span>
           <span className="text-scooby-amarelo text-xl font-black">R$ {totalComDesconto.toFixed(2).replace('.', ',')}</span>
         </div>
@@ -445,14 +442,7 @@ export function ModalPedido({ itens, subtotal, onFechar, onConcluir, taxaEntrega
   const [cupomAplicado, setCupomAplicado] = useState(null)
   const [erroCupom, setErroCupom] = useState('')
 
-  function normalizar(txt) {
-    return txt.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim()
-  }
-  const _bairroNorm = normalizar(dados.bairro)
-  const entregaGratis = dados.tipoEntrega === 'entrega' && (_bairroNorm.includes('caicara'))
-  const taxaEntregaEfetiva = entregaGratis ? 0 : taxaEntrega
-
-  const total = subtotal + taxaEntregaEfetiva
+  const total = subtotal + taxaEntrega
 
   function aplicarCupom() {
     if (!cupomInput.trim()) return
@@ -472,8 +462,8 @@ export function ModalPedido({ itens, subtotal, onFechar, onConcluir, taxaEntrega
     return Math.min(parseFloat(cupomAplicado.valor), base)
   }
 
-  const desconto = calcularDesconto(subtotal + (dados.tipoEntrega === 'entrega' ? taxaEntregaEfetiva : 0))
-  const totalComDesconto = subtotal + (dados.tipoEntrega === 'entrega' ? taxaEntregaEfetiva : 0) - desconto
+  const desconto = calcularDesconto(subtotal + (dados.tipoEntrega === 'entrega' ? taxaEntrega : 0))
+  const totalComDesconto = subtotal + (dados.tipoEntrega === 'entrega' ? taxaEntrega : 0) - desconto
 
   function handleTelefoneChange(tel) {
     setDados(d => ({ ...d, telefone: tel }))
@@ -555,9 +545,9 @@ export function ModalPedido({ itens, subtotal, onFechar, onConcluir, taxaEntrega
   }
 
   async function handleConfirmarPagamento() {
-    const msg = formatarMensagemWhatsApp(dados, itens, subtotal, taxaEntregaEfetiva, desconto, cupomAplicado, tempoEntrega)
+    const msg = formatarMensagemWhatsApp(dados, itens, subtotal, taxaEntrega, desconto, cupomAplicado, tempoEntrega)
     setWhatsAppUrl(`https://wa.me/${whatsappNumero || CONFIG.whatsappNumero}?text=${msg}`)
-    const numPedido = await salvarPedido(dados, itens, subtotal, taxaEntregaEfetiva, desconto, cupomAplicado)
+    const numPedido = await salvarPedido(dados, itens, subtotal, taxaEntrega, desconto, cupomAplicado)
     setNumeroPedido(numPedido)
     salvarClienteAPI(dados)
     if (dados.pagamento === 'Pix') {
@@ -598,13 +588,13 @@ export function ModalPedido({ itens, subtotal, onFechar, onConcluir, taxaEntrega
 
               {/* Telefone */}
               <div>
-                <label className="text-gray-300 text-sm font-medium block mb-1">Telefone *</label>
+                <label className="text-gray-700 text-sm font-medium block mb-1">Telefone *</label>
                 <input
                   type="tel"
                   placeholder="(32) 9 9999-9999"
                   value={dados.telefone}
                   onChange={e => handleTelefoneChange(e.target.value)}
-                  className="w-full bg-scooby-escuro border border-scooby-borda text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-scooby-amarelo"
+                  className="w-full bg-scooby-escuro border border-scooby-borda text-gray-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-scooby-amarelo"
                 />
                 {erros.telefone && <p className="text-red-400 text-xs mt-1">{erros.telefone}</p>}
                 {clienteRecuperado && (
@@ -616,20 +606,20 @@ export function ModalPedido({ itens, subtotal, onFechar, onConcluir, taxaEntrega
 
               {/* Nome */}
               <div>
-                <label className="text-gray-300 text-sm font-medium block mb-1">Seu nome *</label>
+                <label className="text-gray-700 text-sm font-medium block mb-1">Seu nome *</label>
                 <input
                   type="text"
                   placeholder="Ex: João Silva"
                   value={dados.nome}
                   onChange={e => setDados(d => ({ ...d, nome: e.target.value }))}
-                  className="w-full bg-scooby-escuro border border-scooby-borda text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-scooby-amarelo"
+                  className="w-full bg-scooby-escuro border border-scooby-borda text-gray-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-scooby-amarelo"
                 />
                 {erros.nome && <p className="text-red-400 text-xs mt-1">{erros.nome}</p>}
               </div>
 
               {/* Tipo de entrega */}
               <div>
-                <label className="text-gray-300 text-sm font-medium block mb-2">Tipo de entrega *</label>
+                <label className="text-gray-700 text-sm font-medium block mb-2">Tipo de entrega *</label>
                 <div className="flex gap-2">
                   {[['entrega', '🚗 Entrega'], ['retirada', '🏃 Retirar no local']].map(([val, label]) => (
                     <button
@@ -650,7 +640,7 @@ export function ModalPedido({ itens, subtotal, onFechar, onConcluir, taxaEntrega
               {/* Seletor de endereços salvos */}
               {mostrarSeletorEnderecos && (
                 <div>
-                  <label className="text-gray-300 text-sm font-medium block mb-2">📍 Seus endereços salvos</label>
+                  <label className="text-gray-700 text-sm font-medium block mb-2">📍 Seus endereços salvos</label>
                   <div className="space-y-2">
                     {enderecosSalvos.map((end, idx) => (
                       <button
@@ -659,7 +649,7 @@ export function ModalPedido({ itens, subtotal, onFechar, onConcluir, taxaEntrega
                         className={`w-full text-left px-4 py-3 rounded-xl border transition text-sm ${
                           enderecoSelecionado === idx
                             ? 'bg-scooby-vermelho/20 border-scooby-amarelo text-white'
-                            : 'bg-scooby-escuro border-scooby-borda text-gray-300 hover:border-gray-500'
+                            : 'bg-scooby-escuro border-scooby-borda text-gray-700 hover:border-gray-400'
                         }`}
                       >
                         <span className="flex items-start gap-2">
@@ -693,10 +683,10 @@ export function ModalPedido({ itens, subtotal, onFechar, onConcluir, taxaEntrega
               {mostrarFormEndereco && (enderecoSelecionado === 'novo' || enderecosSalvos.length === 0 || enderecoSelecionado !== null) && (
                 <div className="space-y-2">
                   {enderecoSelecionado !== 'novo' && enderecosSalvos.length > 0 && (
-                    <label className="text-gray-300 text-sm font-medium block">Endereço selecionado</label>
+                    <label className="text-gray-700 text-sm font-medium block">Endereço selecionado</label>
                   )}
                   {(enderecoSelecionado === 'novo' || enderecosSalvos.length === 0) && (
-                    <label className="text-gray-300 text-sm font-medium block">Endereço de entrega *</label>
+                    <label className="text-gray-700 text-sm font-medium block">Endereço de entrega *</label>
                   )}
 
                   <div>
@@ -705,7 +695,7 @@ export function ModalPedido({ itens, subtotal, onFechar, onConcluir, taxaEntrega
                       placeholder="Rua *"
                       value={dados.rua}
                       onChange={e => setDados(d => ({ ...d, rua: e.target.value }))}
-                      className="w-full bg-scooby-escuro border border-scooby-borda text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-scooby-amarelo"
+                      className="w-full bg-scooby-escuro border border-scooby-borda text-gray-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-scooby-amarelo"
                     />
                     {erros.rua && <p className="text-red-400 text-xs mt-1">{erros.rua}</p>}
                   </div>
@@ -718,7 +708,7 @@ export function ModalPedido({ itens, subtotal, onFechar, onConcluir, taxaEntrega
                         placeholder="Número *"
                         value={dados.numero}
                         onChange={e => setDados(d => ({ ...d, numero: e.target.value }))}
-                        className="w-full bg-scooby-escuro border border-scooby-borda text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-scooby-amarelo"
+                        className="w-full bg-scooby-escuro border border-scooby-borda text-gray-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-scooby-amarelo"
                       />
                       {erros.numero && <p className="text-red-400 text-xs mt-1">{erros.numero}</p>}
                     </div>
@@ -728,7 +718,7 @@ export function ModalPedido({ itens, subtotal, onFechar, onConcluir, taxaEntrega
                         placeholder="Complemento (opcional)"
                         value={dados.complemento}
                         onChange={e => setDados(d => ({ ...d, complemento: e.target.value }))}
-                        className="w-full bg-scooby-escuro border border-scooby-borda text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-scooby-amarelo"
+                        className="w-full bg-scooby-escuro border border-scooby-borda text-gray-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-scooby-amarelo"
                       />
                     </div>
                   </div>
@@ -739,21 +729,18 @@ export function ModalPedido({ itens, subtotal, onFechar, onConcluir, taxaEntrega
                       placeholder="Bairro *"
                       value={dados.bairro}
                       onChange={e => setDados(d => ({ ...d, bairro: e.target.value }))}
-                      className="w-full bg-scooby-escuro border border-scooby-borda text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-scooby-amarelo"
+                      className="w-full bg-scooby-escuro border border-scooby-borda text-gray-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-scooby-amarelo"
                     />
                     {erros.bairro && <p className="text-red-400 text-xs mt-1">{erros.bairro}</p>}
                   </div>
 
-                  {entregaGratis
-                    ? <p className="text-green-400 text-xs font-semibold">🎉 Entrega grátis para o bairro Caiçaras!</p>
-                    : <p className="text-gray-500 text-xs">Taxa de entrega: R$ {taxaEntrega.toFixed(2).replace('.', ',')}</p>
-                  }
+                  <p className="text-gray-500 text-xs">Taxa de entrega: R$ {taxaEntrega.toFixed(2).replace('.', ',')}</p>
                 </div>
               )}
 
               {/* Pagamento */}
               <div>
-                <label className="text-gray-300 text-sm font-medium block mb-2">Forma de pagamento *</label>
+                <label className="text-gray-700 text-sm font-medium block mb-2">Forma de pagamento *</label>
                 <div className="grid grid-cols-2 sm:grid-cols-2 gap-2">
                   {PAGAMENTOS.map(p => (
                     <button
@@ -774,13 +761,13 @@ export function ModalPedido({ itens, subtotal, onFechar, onConcluir, taxaEntrega
               {/* Troco */}
               {dados.pagamento === 'Dinheiro' && (
                 <div>
-                  <label className="text-gray-300 text-sm font-medium block mb-1">Precisa de troco?</label>
+                  <label className="text-gray-700 text-sm font-medium block mb-1">Precisa de troco?</label>
                   <input
                     type="number"
                     placeholder="Ex: 50,00 (deixe em branco se não precisar)"
                     value={dados.troco}
                     onChange={e => setDados(d => ({ ...d, troco: e.target.value }))}
-                    className="w-full bg-scooby-escuro border border-scooby-borda text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-scooby-amarelo"
+                    className="w-full bg-scooby-escuro border border-scooby-borda text-gray-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-scooby-amarelo"
                   />
                   <p className="text-gray-500 text-xs mt-1">Informe o valor que vai pagar para calcularmos o troco.</p>
                 </div>
@@ -788,20 +775,20 @@ export function ModalPedido({ itens, subtotal, onFechar, onConcluir, taxaEntrega
 
               {/* Observação */}
               <div>
-                <label className="text-gray-300 text-sm font-medium block mb-1">Observações (opcional)</label>
+                <label className="text-gray-700 text-sm font-medium block mb-1">Observações (opcional)</label>
                 <textarea
                   rows={2}
                   placeholder="Ex: sem cebola, ponto da carne..."
                   value={dados.observacao}
                   onChange={e => setDados(d => ({ ...d, observacao: e.target.value }))}
-                  className="w-full bg-scooby-escuro border border-scooby-borda text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-scooby-amarelo resize-none"
+                  className="w-full bg-scooby-escuro border border-scooby-borda text-gray-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-scooby-amarelo resize-none"
                 />
               </div>
 
               {/* Cupom de desconto */}
               {cupons.filter(c => c.ativo).length > 0 && (
                 <div>
-                  <label className="text-gray-300 text-sm font-medium block mb-2">🎟 Cupons disponíveis</label>
+                  <label className="text-gray-700 text-sm font-medium block mb-2">🎟 Cupons disponíveis</label>
                   <div className="flex flex-col gap-2">
                     {cupons.filter(c => c.ativo).map(cupom => {
                       const aplicado = cupomAplicado?.id === cupom.id || cupomAplicado?.codigo === cupom.codigo
@@ -825,7 +812,7 @@ export function ModalPedido({ itens, subtotal, onFechar, onConcluir, taxaEntrega
                           className={`flex items-center justify-between px-4 py-3 rounded-xl border transition active:scale-95 ${
                             aplicado
                               ? 'bg-emerald-900/50 border-emerald-500 text-white'
-                              : 'bg-scooby-escuro border-scooby-borda text-white hover:border-scooby-amarelo'
+                              : 'bg-scooby-escuro border-scooby-borda text-gray-800 hover:border-scooby-amarelo'
                           }`}
                         >
                           <div className="text-left">
@@ -833,7 +820,7 @@ export function ModalPedido({ itens, subtotal, onFechar, onConcluir, taxaEntrega
                             <p className={`text-xs ${aplicado ? 'text-emerald-300' : 'text-gray-400'}`}>{descLabel}</p>
                           </div>
                           <span className={`text-xs font-bold px-2.5 py-1 rounded-lg ${
-                            aplicado ? 'bg-emerald-600 text-white' : 'bg-scooby-borda text-gray-300'
+                            aplicado ? 'bg-emerald-600 text-white' : 'bg-scooby-borda text-gray-600'
                           }`}>
                             {aplicado ? '✅ Aplicado' : 'Ativar'}
                           </span>
@@ -856,12 +843,9 @@ export function ModalPedido({ itens, subtotal, onFechar, onConcluir, taxaEntrega
                   <span>R$ {subtotal.toFixed(2).replace('.', ',')}</span>
                 </div>
                 {dados.tipoEntrega === 'entrega' && (
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-400">Taxa de entrega</span>
-                    {taxaEntregaEfetiva === 0
-                      ? <span className="text-green-400 font-semibold">Grátis 🎉</span>
-                      : <span className="text-gray-400">R$ {taxaEntregaEfetiva.toFixed(2).replace('.', ',')}</span>
-                    }
+                  <div className="flex justify-between text-gray-400 text-sm">
+                    <span>Taxa de entrega</span>
+                    <span>R$ {taxaEntrega.toFixed(2).replace('.', ',')}</span>
                   </div>
                 )}
                 {cupomAplicado && (
@@ -870,7 +854,7 @@ export function ModalPedido({ itens, subtotal, onFechar, onConcluir, taxaEntrega
                     <span>- R$ {desconto.toFixed(2).replace('.', ',')}</span>
                   </div>
                 )}
-                <div className="flex justify-between font-bold text-white border-t border-scooby-borda pt-1.5">
+                <div className="flex justify-between font-bold text-gray-800 border-t border-scooby-borda pt-1.5">
                   <span>Total</span>
                   <span className="text-scooby-amarelo text-lg">
                     R$ {totalComDesconto.toFixed(2).replace('.', ',')}
@@ -892,7 +876,7 @@ export function ModalPedido({ itens, subtotal, onFechar, onConcluir, taxaEntrega
               dados={dados}
               itens={itens}
               subtotal={subtotal}
-              taxaEntrega={taxaEntregaEfetiva}
+              taxaEntrega={taxaEntrega}
               desconto={desconto}
               cupomAplicado={cupomAplicado}
               totalComDesconto={totalComDesconto}

@@ -12,7 +12,7 @@ function ModalVariacao({ item, campo, titulo, onEscolher, onFechar }) {
         onClick={e => e.stopPropagation()}
       >
         <h3 className="text-scooby-amarelo font-bold text-base leading-tight mb-1">{item.nome}</h3>
-        <p className="text-gray-400 text-xs mb-4">{item.descricao}</p>
+
 
         <p className="text-gray-700 font-semibold text-sm mb-3">{titulo}</p>
         <div className="flex flex-col gap-2">
@@ -85,7 +85,7 @@ export function CardItem({ item, adicionar, lojaAberta = true, desativado = fals
         <div className="flex-1 min-w-0 p-3 flex flex-col justify-between">
           <div>
             <h3 className="text-gray-800 font-bold text-sm leading-tight line-clamp-2 mb-1">{item.nome}</h3>
-            <p className="text-gray-400 text-xs leading-relaxed line-clamp-2">{item.descricao}</p>
+
             {temVariacao && (
               <p className="text-xs text-gray-500 mt-1 italic">Escolha o sabor ao adicionar</p>
             )}
