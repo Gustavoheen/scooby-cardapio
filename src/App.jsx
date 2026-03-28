@@ -65,7 +65,7 @@ function BannerCupom({ cupons }) {
 
 import Admin from './pages/Admin'
 import AcompanharPedido from './pages/AcompanharPedido'
-import Garcom from './pages/Garcom'
+import Dona from './pages/Dona'
 import { categorias, ADICIONAIS } from './data/cardapio'
 import { useCarrinho } from './hooks/useCarrinho'
 import { CardItem } from './components/CardItem'
@@ -75,7 +75,7 @@ import { ModalPedido } from './components/ModalPedido'
 import { CONFIG } from './config'
 
 function calcLojaAberta(state) {
-  if (import.meta.env.DEV || window.location.hostname.endsWith('vercel.app')) return true
+  if (import.meta.env.DEV) return true
   const status = state.lojaStatus
   if (status === 'aberta') return true
   if (status === 'fechada') return false
@@ -96,9 +96,9 @@ function calcLojaAberta(state) {
 export default function App() {
   if (window.location.pathname === '/admin') return <Admin />
   if (window.location.pathname === '/acompanhar') return <AcompanharPedido />
-  if (window.location.pathname === '/garcom') return <Garcom />
+  if (window.location.pathname === '/dona') return <Dona />
 
-  const [categoriaAtiva, setCategoriaAtiva] = useState(categorias[0].id)
+const [categoriaAtiva, setCategoriaAtiva] = useState(categorias[0].id)
   const [drawerAberto, setDrawerAberto] = useState(false)
   const [modalAberto, setModalAberto] = useState(false)
   const [pedidoConcluido, setPedidoConcluido] = useState(false)
@@ -111,22 +111,6 @@ export default function App() {
 
   useEffect(() => {
     fetch('/api/cardapio-state').then(r => r.json()).then(setCardapioState).catch(() => {})
-  }, [])
-
-  // Auto-atualização: verifica novo deploy a cada 60s e recarrega silenciosamente
-  useEffect(() => {
-    let versaoAtual = null
-    async function checarVersao() {
-      try {
-        const r = await fetch('/api/version')
-        const { version } = await r.json()
-        if (!versaoAtual) { versaoAtual = version; return }
-        if (version !== versaoAtual) window.location.reload()
-      } catch {}
-    }
-    checarVersao()
-    const id = setInterval(checarVersao, 60000)
-    return () => clearInterval(id)
   }, [])
 
   const taxaEntrega = cardapioState.taxaEntrega ?? CONFIG.taxaEntrega
@@ -168,13 +152,14 @@ export default function App() {
           }),
         }
       }
-      return desativado ? { ...itemAtualizado, _desativado: true } : itemAtualizado
+      if (desativado) return null
+      return itemAtualizado
     })
   }
 
   function handleLoginAdmin(e) {
     e.preventDefault()
-    if (senhaAdmin === 'scooby2024') {
+    if (senhaAdmin === 'thalia2025') {
       window.location.href = '/admin'
     } else {
       setErroAdmin(true)
@@ -219,17 +204,17 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-[100dvh] bg-scooby-escuro text-white relative">
+    <div className="min-h-[100dvh] bg-scooby-escuro text-gray-800 relative">
 
       {/* Watermark desktop — logo centralizada e transparente cobrindo a página toda */}
       <div
         className="hidden lg:block fixed inset-0 pointer-events-none z-0"
         style={{
-          backgroundImage: 'url(/logo-desktop.png)',
+          backgroundImage: 'url(/logo-thalia.jpg)',
           backgroundSize: 'cover',
           backgroundPosition: 'center',
           backgroundRepeat: 'no-repeat',
-          opacity: 0.07,
+          opacity: 0.04,
         }}
       />
 
@@ -237,11 +222,11 @@ export default function App() {
       <div
         className="block lg:hidden fixed inset-0 pointer-events-none z-0"
         style={{
-          backgroundImage: 'url(/logo-mobile.png)',
+          backgroundImage: 'url(/logo-thalia.jpg)',
           backgroundSize: 'cover',
           backgroundPosition: 'center top',
           backgroundRepeat: 'no-repeat',
-          opacity: 0.08,
+          opacity: 0.04,
         }}
       />
 
@@ -265,28 +250,28 @@ export default function App() {
         <div className="relative max-w-7xl mx-auto px-4 py-10 flex flex-col items-center gap-4">
           {/* Logo principal — só no desktop (no mobile o fundo já é a imagem) */}
           <img
-            src="/logo-desktop.png"
-            alt="Scooby-Doo Lanches"
+            src="/logo-thalia.jpg"
+            alt="Thalia Moreira Doces"
             className="hidden lg:block w-40 h-40 object-contain drop-shadow-2xl"
           />
 
           <div className="text-center">
             <h1 className="text-scooby-amarelo font-black text-3xl tracking-wide uppercase drop-shadow">
-              Scooby-Doo Lanches
+              Thalia Moreira Doces
             </h1>
-            <p className="text-gray-300 lg:text-gray-400 text-sm mt-1">Hamburgueria &amp; Delivery — {CONFIG.cidade}</p>
+            <p className="text-gray-600 text-sm mt-1">Doces Artesanais — {CONFIG.cidade}</p>
 
             <div className="flex flex-wrap justify-center gap-2 mt-3">
               <span className={`text-xs px-3 py-1.5 rounded-full font-semibold border ${lojaAberta ? 'bg-green-900/50 border-green-700 text-green-400' : 'bg-red-900/50 border-red-700 text-red-400'}`}>
                 {lojaAberta ? '🟢 Aberto agora' : '🔴 Fechado agora'}
               </span>
-              <span className="bg-scooby-card border border-scooby-borda text-gray-300 text-xs px-3 py-1.5 rounded-full">
+              <span className="bg-scooby-card border border-scooby-borda text-gray-600 text-xs px-3 py-1.5 rounded-full">
                 ⏰ {cardapioState.horarioAbertura || CONFIG.horarioAbertura} – {cardapioState.horarioFechamento || CONFIG.horarioFechamento}
               </span>
-              <span className="bg-scooby-card border border-scooby-borda text-gray-300 text-xs px-3 py-1.5 rounded-full">
+              <span className="bg-scooby-card border border-scooby-borda text-gray-600 text-xs px-3 py-1.5 rounded-full">
                 🚗 Entrega R$ {taxaEntrega.toFixed(2).replace('.', ',')}
               </span>
-              <span className="bg-scooby-card border border-scooby-borda text-gray-300 text-xs px-3 py-1.5 rounded-full">
+              <span className="bg-scooby-card border border-scooby-borda text-gray-600 text-xs px-3 py-1.5 rounded-full">
                 ⏱ {tempoEntrega}
               </span>
               <a
@@ -298,9 +283,9 @@ export default function App() {
             </div>
 
             {!lojaAberta && (
-              <div className="mt-4 bg-red-900/40 border border-red-700/60 text-red-300 text-sm font-medium px-5 py-3 rounded-2xl text-center max-w-sm">
+              <div className="mt-4 bg-red-50 border border-red-200 text-red-600 text-sm font-medium px-5 py-3 rounded-2xl text-center max-w-sm">
                 😴 Estamos fechados no momento.<br />
-                <span className="text-red-400 font-bold">Abrimos às {cardapioState.horarioAbertura || CONFIG.horarioAbertura}h</span>
+                <span className="text-red-500 font-bold">Abrimos às {cardapioState.horarioAbertura || CONFIG.horarioAbertura}h</span>
               </div>
             )}
           </div>
@@ -313,17 +298,24 @@ export default function App() {
             >
               <span className="bg-black/30 w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold">{totalItens}</span>
               <span>Meu pedido</span>
-              <span className="text-yellow-300">R$ {subtotal.toFixed(2).replace('.', ',')}</span>
+              <span className="text-pink-200">R$ {subtotal.toFixed(2).replace('.', ',')}</span>
             </button>
           )}
         </div>
       </header>
 
       {/* ── ABAS DE CATEGORIA ── */}
-      <div className="sticky top-0 z-30 bg-black/80 backdrop-blur border-b border-scooby-borda shadow-lg">
+      <div className="sticky top-0 z-30 bg-white/95 backdrop-blur border-b border-scooby-borda shadow-sm">
+        {/* Hint acima da barra */}
+        <div className="flex justify-end px-3 pt-1.5">
+          <div className="flex items-center gap-1">
+            <span className="text-[10px] text-gray-400 font-semibold">arraste para o lado</span>
+            <span className="text-base animate-slide-right leading-none">🍫</span>
+          </div>
+        </div>
         <div className="max-w-7xl mx-auto px-3">
           <div className="relative">
-            <div ref={scrollCategoriasRef} className="flex overflow-x-auto gap-1.5 py-2.5" style={{ scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' }}>
+            <div ref={scrollCategoriasRef} className="flex overflow-x-auto gap-1.5 py-2" style={{ scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' }}>
               {categorias.map(cat => (
                 <button
                   key={cat.id}
@@ -331,29 +323,13 @@ export default function App() {
                   className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-semibold transition whitespace-nowrap ${
                     categoriaAtiva === cat.id
                       ? 'bg-scooby-amarelo text-black shadow'
-                      : 'text-gray-400 hover:text-white hover:bg-scooby-borda'
+                      : 'text-gray-500 hover:text-gray-800 hover:bg-pink-50'
                   }`}
                 >
                   {cat.emoji} {cat.nome.split(' ').slice(1).join(' ')}
                 </button>
               ))}
-              <div className="flex-shrink-0 w-8" />
-            </div>
-            {/* Gradiente + seta clicável */}
-            <div
-              className="absolute right-0 top-0 h-full w-12 bg-gradient-to-l from-black/90 to-transparent cursor-pointer flex items-center justify-center"
-              onClick={() => {
-                const el = scrollCategoriasRef.current
-                if (!el) return
-                const novaPos = el.scrollLeft + el.clientWidth * 0.6
-                if (novaPos >= el.scrollWidth - el.clientWidth - 5) {
-                  el.scrollTo({ left: 0, behavior: 'smooth' })
-                } else {
-                  el.scrollTo({ left: novaPos, behavior: 'smooth' })
-                }
-              }}
-            >
-              <span className="text-scooby-vermelho font-bold text-lg animate-bounce-x">›</span>
+              <div className="flex-shrink-0 w-4" />
             </div>
           </div>
         </div>
@@ -365,26 +341,34 @@ export default function App() {
         {/* Combos/Promoções */}
         {combosAtivos.length > 0 && (
           <div className="mb-6">
-            <h2 className="text-white font-bold text-lg mb-3 flex items-center gap-2">
+            <h2 className="text-gray-800 font-bold text-lg mb-3 flex items-center gap-2">
               <span className="w-1 h-6 bg-scooby-vermelho rounded-full inline-block"></span>
               🎉 Promoções do Dia
             </h2>
-            <div className="flex flex-col gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
               {combosAtivos.map(combo => {
                 const descricaoItens = combo.itens.map(it => `${it.quantidade}x ${it.label}`).join(' + ')
                 return (
-                  <div key={combo.id} className="bg-scooby-card border border-scooby-vermelho/60 rounded-xl px-3 py-2.5 flex items-center gap-3 hover:border-scooby-amarelo transition-all">
-                    <span className="text-xl flex-shrink-0">🎉</span>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-white font-bold text-sm leading-tight">{combo.nome}</p>
-                      <p className="text-gray-500 text-xs truncate">{descricaoItens}{combo.descricao ? ` · ${combo.descricao}` : ''}</p>
+                  <div key={combo.id} className="bg-scooby-card border-2 border-scooby-vermelho rounded-2xl p-4 flex flex-col justify-between relative overflow-hidden hover:border-scooby-amarelo transition-all hover:shadow-lg hover:shadow-pink-100">
+                    <div className="absolute top-3 right-3">
+                      <span className="bg-scooby-vermelho text-white text-xs font-bold px-2 py-0.5 rounded-full animate-pulse">PROMOÇÃO</span>
                     </div>
-                    <span className="text-green-400 font-black text-sm flex-shrink-0">R$ {Number(combo.precoCombo).toFixed(2).replace('.', ',')}</span>
-                    <button
-                      onClick={lojaAberta ? () => adicionarCombo(combo) : undefined}
-                      disabled={!lojaAberta}
-                      className={`flex-shrink-0 w-9 h-9 rounded-xl font-bold text-xl flex items-center justify-center transition active:scale-90 ${lojaAberta ? 'bg-scooby-vermelho hover:bg-red-700 text-white' : 'bg-scooby-borda text-gray-500 cursor-not-allowed'}`}
-                    >+</button>
+                    <div>
+                      <h3 className="text-gray-800 font-bold text-base leading-tight pr-20">{combo.nome}</h3>
+                      <p className="text-gray-400 text-xs mt-1 leading-relaxed">{descricaoItens}</p>
+                      {combo.descricao && <p className="text-green-400 text-xs font-semibold mt-1">🎉 {combo.descricao}</p>}
+                    </div>
+                    <div className="flex items-center justify-between mt-3 pt-3 border-t border-scooby-borda">
+                      <span className="text-green-400 font-black text-lg">R$ {Number(combo.precoCombo).toFixed(2).replace('.', ',')}</span>
+                      <button
+                        onClick={lojaAberta ? () => adicionarCombo(combo) : undefined}
+                        disabled={!lojaAberta}
+                        className={`flex items-center gap-1.5 font-bold text-sm px-4 py-2 rounded-xl transition active:scale-95 ${lojaAberta ? 'bg-scooby-vermelho hover:bg-red-700 text-white cursor-pointer' : 'bg-scooby-borda text-gray-500 cursor-not-allowed'}`}
+                      >
+                        <span className="text-lg leading-none">+</span>
+                        {lojaAberta ? 'Adicionar' : 'Fechado'}
+                      </button>
+                    </div>
                   </div>
                 )
               })}
@@ -397,12 +381,12 @@ export default function App() {
 
           {/* Cardápio */}
           <main className="flex-1 pb-32 lg:pb-6">
-            <h2 className="text-white font-bold text-lg mb-5 flex items-center gap-2">
+            <h2 className="text-gray-800 font-bold text-lg mb-5 flex items-center gap-2">
               <span className="w-1 h-6 bg-scooby-amarelo rounded-full inline-block"></span>
               {categoriaExibida.nome}
             </h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-              {aplicarOverrides(categoriaExibida.itens).map(item => (
+              {aplicarOverrides(categoriaExibida.itens).filter(Boolean).map(item => (
                 <CardItem
                   key={item.id}
                   item={item}
@@ -431,8 +415,8 @@ export default function App() {
 
       {/* ── RODAPÉ ── */}
       <footer className="border-t border-scooby-borda mt-4 py-8 text-center">
-        <img src="/logo-nova.png" alt="Scooby-Doo Lanches" className="w-20 h-20 object-contain mx-auto mb-3 opacity-70" />
-        <p className="text-gray-500 text-xs">© {new Date().getFullYear()} Scooby-Doo Lanches — Todos os direitos reservados</p>
+        <img src="/logo-thalia.jpg" alt="Thalia Moreira Doces" className="w-20 h-20 object-contain mx-auto mb-3 opacity-70 rounded-full" />
+        <p className="text-gray-500 text-xs">© {new Date().getFullYear()} Thalia Moreira Doces — Todos os direitos reservados</p>
         <p className="text-gray-600 text-xs mt-1">{CONFIG.cidade}</p>
       </footer>
 
@@ -447,7 +431,7 @@ export default function App() {
               {totalItens}
             </span>
             <span>Ver meu pedido</span>
-            <span className="text-yellow-300 font-semibold">R$ {subtotal.toFixed(2).replace('.', ',')}</span>
+            <span className="text-pink-200 font-semibold">R$ {subtotal.toFixed(2).replace('.', ',')}</span>
           </button>
         </div>
       )}
@@ -497,7 +481,7 @@ export default function App() {
       {modalAdmin && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70">
           <div className="bg-scooby-card border border-scooby-borda rounded-2xl p-7 w-full max-w-xs text-center">
-            <img src="/logo-nova.png" alt="Logo" className="w-16 h-16 object-contain mx-auto mb-4" />
+            <img src="/logo-thalia.jpg" alt="Logo" className="w-16 h-16 object-contain mx-auto mb-4 rounded-full" />
             <h2 className="text-scooby-amarelo font-bold text-lg mb-1">Área Administrativa</h2>
             <p className="text-gray-400 text-xs mb-5">Digite a senha para acessar o painel</p>
             <form onSubmit={handleLoginAdmin} className="space-y-3">
@@ -507,7 +491,7 @@ export default function App() {
                 value={senhaAdmin}
                 onChange={e => setSenhaAdmin(e.target.value)}
                 autoFocus
-                className={`w-full bg-scooby-escuro border text-white rounded-xl px-4 py-3 text-sm focus:outline-none transition ${
+                className={`w-full bg-scooby-escuro border text-gray-800 rounded-xl px-4 py-3 text-sm focus:outline-none transition ${
                   erroAdmin ? 'border-red-500' : 'border-scooby-borda focus:border-scooby-amarelo'
                 }`}
               />

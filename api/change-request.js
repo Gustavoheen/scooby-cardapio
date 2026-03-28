@@ -20,11 +20,11 @@ module.exports = async function handler(req, res) {
     const { data, error } = await resend.emails.send({
       from: 'onboarding@resend.dev',
       to: [EMAIL_DESTINO],
-      subject: '📋 Nova solicitação de alteração — Scooby-Doo Lanches',
+      subject: '📋 Nova solicitação de alteração — Thalia Moreira Doces',
       html: `
         <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;background:#1e1e1e;color:#fff;border-radius:12px;overflow:hidden;">
-          <div style="background:#CC0000;padding:24px;text-align:center;">
-            <h1 style="color:#FFD700;margin:0;font-size:20px;">🍔 Scooby-Doo Lanches</h1>
+          <div style="background:#9d174d;padding:24px;text-align:center;">
+            <h1 style="color:#f472b6;margin:0;font-size:20px;">🍫 Thalia Moreira Doces</h1>
             <p style="color:#fff;margin:8px 0 0;font-size:14px;">Nova solicitação de alteração no cardápio</p>
           </div>
           <div style="padding:24px;">

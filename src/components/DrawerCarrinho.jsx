@@ -1,7 +1,13 @@
+import { useEffect } from 'react'
 import { CONFIG } from '../config'
 
 export function DrawerCarrinho({ itens, subtotal, remover, adicionar, onFechar, onFinalizar, taxaEntrega = CONFIG.taxaEntrega }) {
   const total = subtotal + taxaEntrega
+
+  useEffect(() => {
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = '' }
+  }, [])
 
   if (itens.length === 0) {
     return (
@@ -37,7 +43,7 @@ export function DrawerCarrinho({ itens, subtotal, remover, adicionar, onFechar, 
           {itens.map(linha => (
             <div key={linha.chave} className="flex items-center justify-between gap-2">
               <div className="flex-1 min-w-0">
-                <p className="text-white text-sm font-medium truncate">
+                <p className="text-gray-800 text-sm font-medium truncate">
                   {linha.item.nome}
                   {linha.variacao && <span className="text-gray-400 text-xs ml-1">({linha.variacao})</span>}
                 </p>
@@ -48,11 +54,11 @@ export function DrawerCarrinho({ itens, subtotal, remover, adicionar, onFechar, 
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => remover(linha.chave)}
-                  className="w-7 h-7 rounded-full bg-scooby-borda hover:bg-red-800 text-white font-bold flex items-center justify-center transition"
+                  className="w-7 h-7 rounded-full bg-scooby-borda hover:bg-red-800 text-gray-700 hover:text-white font-bold flex items-center justify-center transition"
                 >
                   −
                 </button>
-                <span className="text-white font-bold w-4 text-center">{linha.qtd}</span>
+                <span className="text-gray-800 font-bold w-4 text-center">{linha.qtd}</span>
                 <button
                   onClick={() => adicionar(linha.item, linha.variacao ? { label: linha.variacao, preco: linha.preco } : null)}
                   className="w-7 h-7 rounded-full bg-scooby-vermelho hover:bg-red-700 text-white font-bold flex items-center justify-center transition"
@@ -74,7 +80,7 @@ export function DrawerCarrinho({ itens, subtotal, remover, adicionar, onFechar, 
             <span>Taxa de entrega</span>
             <span>R$ {taxaEntrega.toFixed(2).replace('.', ',')}</span>
           </div>
-          <div className="flex justify-between text-white font-bold text-lg">
+          <div className="flex justify-between text-gray-800 font-bold text-lg">
             <span>Total</span>
             <span className="text-scooby-amarelo">R$ {total.toFixed(2).replace('.', ',')}</span>
           </div>
