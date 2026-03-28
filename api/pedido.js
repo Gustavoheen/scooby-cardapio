@@ -18,13 +18,17 @@ module.exports = async function handler(req, res) {
 
   try {
     if (req.method === 'GET') {
+      // Nunca cachear — admin precisa de dados em tempo real
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate')
+      res.setHeader('Pragma', 'no-cache')
+
       const { telefone } = req.query
 
       // Rota pública: busca por telefone (para acompanhamento do cliente)
       if (telefone) {
         const tel = telefone.replace(/\D/g, '')
         const { data, error } = await supabase
-          .from('thalia_orders')
+          .from('orders')
           .select('id, data, criadoEm')
           .filter('data->>telefone', 'eq', tel)
           .order('id', { ascending: false })
@@ -49,7 +53,7 @@ module.exports = async function handler(req, res) {
 
       // Rota admin: retorna todos os pedidos
       const { data, error } = await supabase
-        .from('thalia_orders')
+        .from('orders')
         .select('id, data, criadoEm')
         .order('id', { ascending: false })
       if (error) throw error
@@ -76,10 +80,10 @@ module.exports = async function handler(req, res) {
       const umaHoraAtras = new Date(Date.now() - 60 * 60 * 1000).toISOString()
 
       const [storeResult, rateResult] = await Promise.all([
-        supabase.from('thalia_store_state').select('bloqueados').eq('id', 1).single(),
+        supabase.from('store_state').select('bloqueados').eq('id', 1).single(),
         telNorm
           ? supabase
-              .from('thalia_orders')
+              .from('orders')
               .select('*', { count: 'exact', head: true })
               .filter('data->>telefone', 'eq', telNorm)
               .gte('criadoEm', umaHoraAtras)
@@ -101,7 +105,7 @@ module.exports = async function handler(req, res) {
       const id = Date.now()
       const hoje = new Date().toLocaleDateString('pt-BR')
       const { count } = await supabase
-        .from('thalia_orders')
+        .from('orders')
         .select('*', { count: 'exact', head: true })
         .filter('data->>data', 'eq', hoje)
       const numeroPedido = `${hoje.replace(/\//g, '')}-${String((count || 0) + 1).padStart(3, '0')}`
@@ -111,7 +115,7 @@ module.exports = async function handler(req, res) {
       const payload = { ...bodyLimpo, telefone: telNorm || telefone, numeroPedido }
 
       const { error } = await supabase
-        .from('thalia_orders')
+        .from('orders')
         .insert({ id, data: payload })
       if (error) throw error
       return res.status(200).json({ sucesso: true, numeroPedido })
@@ -120,7 +124,7 @@ module.exports = async function handler(req, res) {
     if (req.method === 'PATCH') {
       const { id } = req.query
       if (!id) return res.status(400).json({ erro: 'Informe o id do pedido' })
-      const { data: row, error: fetchErr } = await supabase.from('thalia_orders').select('data').eq('id', id).single()
+      const { data: row, error: fetchErr } = await supabase.from('orders').select('data').eq('id', id).single()
       if (fetchErr) throw fetchErr
       const updates = {}
       if (req.body?.status !== undefined) {
@@ -132,7 +136,7 @@ module.exports = async function handler(req, res) {
         updates.pixConfirmadoEm = new Date().toISOString()
       }
       const novaData = { ...row.data, ...updates }
-      const { error: updateErr } = await supabase.from('thalia_orders').update({ data: novaData }).eq('id', id)
+      const { error: updateErr } = await supabase.from('orders').update({ data: novaData }).eq('id', id)
       if (updateErr) throw updateErr
       return res.status(200).json({ sucesso: true })
     }
@@ -140,10 +144,10 @@ module.exports = async function handler(req, res) {
     if (req.method === 'DELETE') {
       const { id, telefone } = req.query
       if (id) {
-        const { error } = await supabase.from('thalia_orders').delete().eq('id', id)
+        const { error } = await supabase.from('orders').delete().eq('id', id)
         if (error) throw error
       } else if (telefone) {
-        const { error } = await supabase.from('thalia_orders').delete().filter('data->>telefone', 'eq', telefone)
+        const { error } = await supabase.from('orders').delete().filter('data->>telefone', 'eq', telefone)
         if (error) throw error
       } else {
         return res.status(400).json({ erro: 'Informe id ou telefone' })

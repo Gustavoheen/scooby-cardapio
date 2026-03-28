@@ -7,7 +7,7 @@ import { CONFIG } from '../config'
 
 const SENHA_MASTER = 'scooby_master_dev#2024'
 const NOME_MASTER = 'Gustavo'
-const SENHA_JULIO_PADRAO = 'thalia2025'
+const SENHA_JULIO_PADRAO = 'scooby2024'
 const WHATSAPP_DEV = '5532999301657'
 
 function hoje() {
@@ -33,25 +33,13 @@ function filtrarPedidos(pedidos, dataFiltro, pagamentoFiltro) {
 }
 
 // ── ESC/POS — impressão direta na térmica ────────────────────────
-const COLS = 32 // KP-IM607: 32 caracteres por linha
+const COLS = 24 // papel 80mm com fonte 2x: 24 caracteres por linha
 
 function encode(str) {
-  // Latin-1 / Windows-1252 — mais compatível com impressoras térmicas (ESC t 16)
-  const map = {
-    'À':0xC0,'Á':0xC1,'Â':0xC2,'Ã':0xC3,'Ä':0xC4,'Å':0xC5,
-    'Ç':0xC7,'È':0xC8,'É':0xC9,'Ê':0xCA,'Ë':0xCB,
-    'Ì':0xCC,'Í':0xCD,'Î':0xCE,'Ï':0xCF,
-    'Ñ':0xD1,'Ò':0xD2,'Ó':0xD3,'Ô':0xD4,'Õ':0xD5,'Ö':0xD6,
-    'Ù':0xD9,'Ú':0xDA,'Û':0xDB,'Ü':0xDC,
-    'à':0xE0,'á':0xE1,'â':0xE2,'ã':0xE3,'ä':0xE4,'å':0xE5,
-    'ç':0xE7,'è':0xE8,'é':0xE9,'ê':0xEA,'ë':0xEB,
-    'ì':0xEC,'í':0xED,'î':0xEE,'ï':0xEF,
-    'ñ':0xF1,'ò':0xF2,'ó':0xF3,'ô':0xF4,'õ':0xF5,'ö':0xF6,
-    'ù':0xF9,'ú':0xFA,'û':0xFB,'ü':0xFC,'ß':0xDF,
-  }
-  const bytes = []
-  for (const c of str) bytes.push(map[c] ?? (c.charCodeAt(0) < 128 ? c.charCodeAt(0) : 0x3F))
-  return bytes
+  // Normaliza acentos para ASCII puro (NFD decompose + remove combining chars)
+  // Garante compatibilidade com qualquer impressora térmica sem depender de code page
+  const ascii = str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^\x00-\x7F]/g, '?')
+  return ascii.split('').map(c => c.charCodeAt(0))
 }
 
 function gerarEscPos(pedido) {
@@ -62,7 +50,7 @@ function gerarEscPos(pedido) {
   const centro = () => push(0x1B, 0x61, 0x01)
   const esq    = () => push(0x1B, 0x61, 0x00)
   const bold   = (on) => push(0x1B, 0x45, on ? 1 : 0)
-  const grande = (on) => push(0x1B, 0x21, on ? 0x30 : 0x00)
+  const grande = (_on) => {} // tamanho fixo 2x2 via GS ! abaixo
   const linha  = () => { txt('-'.repeat(COLS)); nl() }
 
   function row(left, right) {
@@ -106,14 +94,14 @@ function gerarEscPos(pedido) {
 
   // Init
   push(0x1B, 0x40)       // ESC @ reset
-  push(0x1B, 0x74, 0x10) // ESC t 16 — Windows-1252 / Latin-1
+  push(0x1D, 0x21, 0x11) // GS ! — fonte 2x largura + 2x altura (padrao legivel em 80mm)
 
   // Cabeçalho
   centro(); bold(true); grande(true)
-  txt('THALIA MOREIRA'); nl()
-  txt('DOCES'); nl()
+  txt('SCOOBY-DOO'); nl()
+  txt('LANCHES'); nl()
   grande(false)
-  txt('Doces Artesanais'); nl()
+  txt('Hamburguer Artesanal'); nl()
   bold(false); esq(); linha()
 
   row('Pedido:', pedido.numeroPedido || pedido.id || '—')
@@ -121,7 +109,7 @@ function gerarEscPos(pedido) {
   linha()
 
   bold(true); txt('ITENS:'); nl(); bold(false)
-  (pedido.itensPedido || '').split(' | ').forEach(printItem)
+  pedido.itensPedido.split(' | ').forEach(printItem)
   linha()
 
   row('Subtotal:', `R$ ${pedido.subtotal}`)
@@ -152,15 +140,15 @@ function gerarEscPos(pedido) {
 }
 
 function gerarCupom(pedido, alturaMm) {
-  const itens = (pedido.itensPedido || '').split(' | ').map(i => `<div class="item">• ${i}</div>`).join('')
-  const pageSize = alturaMm ? `76mm ${alturaMm}mm` : '76mm auto'
+  const itens = pedido.itensPedido.split(' | ').map(i => `<div class="item">• ${i}</div>`).join('')
+  const pageSize = alturaMm ? `80mm ${alturaMm}mm` : '80mm auto'
   return `<!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>Pedido</title>
 <style>
   @page { size: ${pageSize} !important; margin: 0 !important; }
-  html { margin: 0; padding: 0; width: 76mm; height: auto; overflow: hidden; }
+  html { margin: 0; padding: 0; width: 80mm; height: auto; overflow: hidden; }
   * { box-sizing: border-box; }
-  body { font-family: 'Courier New', monospace; font-size: 11px; width: 72mm; margin: 2mm; padding: 0; color: #000; height: auto; overflow: hidden; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body { font-family: 'Courier New', monospace; font-size: 11px; width: 76mm; margin: 2mm; padding: 0; color: #000; height: auto; overflow: hidden; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   * { color: #000 !important; -webkit-font-smoothing: none; font-weight: 500; }
   .center { text-align: center; }
   .bold { font-weight: 900; }
@@ -171,8 +159,8 @@ function gerarCupom(pedido, alturaMm) {
   .total-row { display: flex; justify-content: space-between; font-weight: bold; font-size: 13px; margin: 2px 0; }
 </style></head>
 <body>
-  <div class="center bold big">THALIA MOREIRA DOCES</div>
-  <div class="center" style="font-size:9px">Doces Artesanais</div>
+  <div class="center bold big">SCOOBY-DOO LANCHES</div>
+  <div class="center" style="font-size:9px">Hamburguer Artesanal</div>
   <div class="line"></div>
   <div class="row"><span>Pedido:</span><span class="bold">${pedido.numeroPedido || pedido.id || '—'}</span></div>
   <div class="row"><span>Data:</span><span>${pedido.data} ${pedido.hora}</span></div>
@@ -201,8 +189,8 @@ function gerarCupom(pedido, alturaMm) {
 
 function imprimirPedido(pedido) {
   // Passo 1: renderiza invisível para medir a altura real do conteúdo
-  // 76mm a 96dpi = 58 * 96 / 25.4 ≈ 219px
-  const medidor = window.open('', '_blank', 'width=287,height=100,left=-9999,top=-9999')
+  // 80mm a 96dpi = 80 * 96 / 25.4 ≈ 302px
+  const medidor = window.open('', '_blank', 'width=302,height=100,left=-9999,top=-9999')
   if (!medidor) { alert('Permita pop-ups para imprimir.'); return }
   medidor.document.write(gerarCupom(pedido))
   medidor.document.close()
@@ -214,7 +202,7 @@ function imprimirPedido(pedido) {
     medidor.close()
 
     // Passo 2: abre janela de impressão com @page já no tamanho exato
-    const w = window.open('', '_blank', `width=287,height=${alturaPixels + 40},left=0,top=0`)
+    const w = window.open('', '_blank', `width=302,height=${alturaPixels + 40},left=0,top=0`)
     if (!w) { alert('Permita pop-ups para imprimir.'); return }
     w.document.write(gerarCupom(pedido, alturaMm))
     w.document.close()
@@ -228,7 +216,7 @@ function imprimirPedido(pedido) {
 
 function CardStat({ label, valor, sub, cor }) {
   return (
-    <div className="bg-[#1e1e1e] border border-[#2e2e2e] rounded-2xl p-4">
+    <div className="bg-scooby-card border border-scooby-borda rounded-2xl p-4">
       <p className="text-gray-400 text-xs mb-1">{label}</p>
       <p className={`font-bold text-2xl ${cor}`}>{valor}</p>
       {sub && <p className="text-gray-500 text-xs mt-1">{sub}</p>}
@@ -238,13 +226,13 @@ function CardStat({ label, valor, sub, cor }) {
 
 function gerarMsgWhatsApp(pedido) {
   const id = pedido.numeroPedido || pedido.id
-  const itens = (pedido.itensPedido || '').replace(/ \| /g, '\n• ')
+  const itens = pedido.itensPedido.replace(/ \| /g, '\n• ')
   const isPix = pedido.pagamento === 'Pix'
   const linhas = [
-    `Olá ${pedido.nomeCliente}! 😊 Recebemos seu pedido na *Thalia Moreira Doces*.`,
+    `Olá ${pedido.nomeCliente}! 😊 Recebemos seu pedido na *Scooby-Doo Lanches*.`,
     ``,
     `📋 *Pedido:* ${id}`,
-    `🍫 *Itens:*\n• ${itens}`,
+    `🍔 *Itens:*\n• ${itens}`,
     `💰 *Total:* R$ ${pedido.total}`,
     `💳 *Pagamento:* ${pedido.pagamento}`,
   ]
@@ -282,7 +270,7 @@ function CardPedido({ pedido, onImprimir, onExcluir, onConfirmarPix, onAtualizar
     <div className={`border rounded-xl overflow-hidden transition-all duration-300 ${
       isNovo
         ? 'bg-blue-950 border-blue-500 shadow-lg shadow-blue-500/30 animate-pulse-border'
-        : 'bg-[#1e1e1e] border-[#2e2e2e]'
+        : 'bg-scooby-card border-scooby-borda'
     } ${selecionado ? '!border-scooby-amarelo' : ''}`}>
       {/* Banner de novo pedido */}
       {isNovo && (
@@ -322,7 +310,7 @@ function CardPedido({ pedido, onImprimir, onExcluir, onConfirmarPix, onAtualizar
           {/* Cliente + itens */}
           <div className="flex-1 min-w-0">
             <p className="text-white font-semibold text-sm truncate">{pedido.nomeCliente}</p>
-            <p className="text-gray-400 text-xs truncate">{(pedido.itensPedido || '').replace(/ \| /g, ' · ')}</p>
+            <p className="text-gray-400 text-xs truncate">{pedido.itensPedido.replace(/ \| /g, ' · ')}</p>
           </div>
 
           {/* Total + badges */}
@@ -341,7 +329,7 @@ function CardPedido({ pedido, onImprimir, onExcluir, onConfirmarPix, onAtualizar
                 {pedido.tipoEntrega === 'Entrega' ? '🛵' : '🏠'}
               </span>
               {pedido.status === 'preparando' && (
-                <span className="text-xs px-1.5 py-0.5 rounded-full font-semibold bg-orange-900 text-orange-300">🍫 Prep.</span>
+                <span className="text-xs px-1.5 py-0.5 rounded-full font-semibold bg-orange-900 text-orange-300">🍔 Prep.</span>
               )}
               {(pedido.status === 'saiu_entrega' || pedido.status === 'pronto_retirada') && (
                 <span className="text-xs px-1.5 py-0.5 rounded-full font-semibold bg-blue-900 text-blue-300">
@@ -378,7 +366,7 @@ function CardPedido({ pedido, onImprimir, onExcluir, onConfirmarPix, onAtualizar
             rel="noreferrer"
             onClick={e => e.stopPropagation()}
             title={`Contatar ${pedido.nomeCliente} via WhatsApp`}
-            className="flex items-center justify-center px-3 text-green-400 hover:text-green-300 hover:bg-green-900/20 transition border-l border-[#2e2e2e] flex-shrink-0"
+            className="flex items-center justify-center px-3 text-green-400 hover:text-green-300 hover:bg-green-900/20 transition border-l border-scooby-borda flex-shrink-0"
           >
             <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
               <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
@@ -389,12 +377,12 @@ function CardPedido({ pedido, onImprimir, onExcluir, onConfirmarPix, onAtualizar
 
       {/* Detalhes expandidos */}
       {expandido && (
-        <div ref={detalhesRef} className="border-t border-[#2e2e2e] bg-[#111111] px-4 py-3 space-y-3">
+        <div ref={detalhesRef} className="border-t border-scooby-borda bg-scooby-escuro px-4 py-3 space-y-3">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <p className="text-gray-500 text-xs uppercase tracking-wide mb-1">Itens do pedido</p>
               <div className="space-y-1">
-                {(pedido.itensPedido || '').split(' | ').map((item, i) => (
+                {pedido.itensPedido.split(' | ').map((item, i) => (
                   <p key={i} className="text-gray-200 text-sm">• {item}</p>
                 ))}
               </div>
@@ -445,7 +433,7 @@ function CardPedido({ pedido, onImprimir, onExcluir, onConfirmarPix, onAtualizar
           </div>
 
           {/* Botões de status */}
-          <div className="border-t border-[#2e2e2e] pt-3">
+          <div className="border-t border-scooby-borda pt-3">
             <p className="text-gray-500 text-xs uppercase tracking-wide mb-2">Status do pedido</p>
             <div className="flex flex-wrap gap-2">
               {(!pedido.status || pedido.status === 'recebido') && (
@@ -453,7 +441,7 @@ function CardPedido({ pedido, onImprimir, onExcluir, onConfirmarPix, onAtualizar
                   onClick={() => onAtualizarStatus(pedido, 'preparando')}
                   className="text-xs font-bold px-3 py-1.5 rounded-lg bg-orange-900/60 hover:bg-orange-800 text-orange-300 transition"
                 >
-                  🍫 Iniciar preparo
+                  🍔 Iniciar preparo
                 </button>
               )}
               {pedido.status === 'preparando' && pedido.tipoEntrega === 'Entrega' && (
@@ -487,7 +475,7 @@ function CardPedido({ pedido, onImprimir, onExcluir, onConfirmarPix, onAtualizar
           </div>
 
           {pedido.cupom && parseFloat(pedido.desconto) > 0 && (
-            <div className="border-t border-[#2e2e2e] pt-3">
+            <div className="border-t border-scooby-borda pt-3">
               <div className="bg-emerald-900/30 border border-emerald-600/50 rounded-xl px-4 py-2.5 flex items-center justify-between">
                 <div>
                   <p className="text-emerald-300 font-bold text-sm">🎟 Cupom aplicado: <span className="font-mono">{pedido.cupom}</span></p>
@@ -498,7 +486,7 @@ function CardPedido({ pedido, onImprimir, onExcluir, onConfirmarPix, onAtualizar
             </div>
           )}
 
-          <div className="border-t border-[#2e2e2e] pt-3 flex flex-wrap items-center gap-3 text-sm">
+          <div className="border-t border-scooby-borda pt-3 flex flex-wrap items-center gap-3 text-sm">
             <span className="text-gray-400">Subtotal: <span className="text-white">R$ {pedido.subtotal}</span></span>
             {pedido.tipoEntrega === 'Entrega' && <span className="text-gray-400">Entrega: <span className="text-white">R$ {pedido.taxaEntrega}</span></span>}
             <span className="text-gray-400">Total: <span className="text-scooby-amarelo font-bold">R$ {pedido.total}</span></span>
@@ -549,7 +537,7 @@ function CardCliente({ cliente: c, onExcluir, onEditar }) {
   }
 
   return (
-    <div className="bg-[#1e1e1e] border border-[#2e2e2e] rounded-2xl px-5 py-4 flex flex-wrap gap-4 items-center">
+    <div className="bg-scooby-card border border-scooby-borda rounded-2xl px-5 py-4 flex flex-wrap gap-4 items-center">
       {/* Avatar */}
       <div className="w-10 h-10 rounded-full bg-scooby-vermelho flex items-center justify-center font-bold text-white text-lg flex-shrink-0">
         {c.nome.charAt(0).toUpperCase()}
@@ -564,7 +552,7 @@ function CardCliente({ cliente: c, onExcluir, onEditar }) {
               value={novoNome}
               onChange={e => setNovoNome(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter') salvar(); if (e.key === 'Escape') setEditando(false) }}
-              className="bg-[#111111] border border-scooby-amarelo text-white rounded-lg px-3 py-1 text-sm focus:outline-none w-48"
+              className="bg-scooby-escuro border border-scooby-amarelo text-white rounded-lg px-3 py-1 text-sm focus:outline-none w-48"
             />
             <button onClick={salvar} disabled={salvando} className="text-xs text-green-400 hover:text-green-300 font-semibold">
               {salvando ? '...' : '✓ Salvar'}
@@ -642,6 +630,8 @@ export default function Admin() {
   const [filtroRapido, setFiltroRapido] = useState('hoje')
   const [pagamentoFiltro, setPagamentoFiltro] = useState('')
   const [ultimaAtualizacao, setUltimaAtualizacao] = useState(null)
+  const [debugInfo, setDebugInfo] = useState('')
+  const [novaVersao, setNovaVersao] = useState(false)
   const [lojaStatus, setLojaStatus] = useState('auto') // 'auto' | 'aberta' | 'fechada'
   const [horarioAberturaEditado, setHorarioAberturaEditado] = useState(CONFIG.horarioAbertura)
   const [horarioFechamentoEditado, setHorarioFechamentoEditado] = useState(CONFIG.horarioFechamento)
@@ -688,8 +678,52 @@ export default function Admin() {
   const [pixChaveEditada, setPixChaveEditada] = useState(CONFIG.pixChave)
   const [pixTipoEditado, setPixTipoEditado] = useState(CONFIG.pixTipo)
   const [pixNomeEditado, setPixNomeEditado] = useState(CONFIG.pixNome)
+  const [senhaGarcomEditada, setSenhaGarcomEditada] = useState('garcom2024')
   const [salvandoConfig, setSalvandoConfig] = useState(false)
   const [msgConfig, setMsgConfig] = useState('')
+
+  // ── Estado da aba Mesas ─────────────────────────────────────
+  const [mesas, setMesas] = useState([])
+  const [mesaFechando, setMesaFechando] = useState(null) // numero da mesa sendo fechada
+  const [pagamentoMesa, setPagamentoMesa] = useState('Dinheiro')
+  const [trocoMesa, setTrocoMesa] = useState('')
+  const [fechandoMesa, setFechandoMesa] = useState(false)
+
+  function buscarMesas() {
+    fetch('/api/mesa').then(r => r.json()).then(setMesas).catch(() => {})
+  }
+
+  async function fecharMesa() {
+    if (!mesaFechando || fechandoMesa) return
+    setFechandoMesa(true)
+    try {
+      const r = await fetch(`/api/mesa?numero=${mesaFechando}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'fechar', pagamento: pagamentoMesa, troco: trocoMesa }),
+      })
+      const j = await r.json()
+      if (!r.ok || j.erro) throw new Error(j.erro || 'Erro')
+      buscarMesas()
+      buscarPedidos()
+      setMesaFechando(null)
+      setPagamentoMesa('Dinheiro')
+      setTrocoMesa('')
+    } catch (e) {
+      alert('Erro ao fechar mesa: ' + e.message)
+    }
+    setFechandoMesa(false)
+  }
+
+  async function resetarMesa(numero) {
+    if (!confirm(`Resetar Mesa ${numero} sem cobrar? Os itens serão apagados.`)) return
+    await fetch(`/api/mesa?numero=${numero}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'resetar' }),
+    })
+    buscarMesas()
+  }
 
   function buildPayload(extras = {}) {
     const precosFinal = {}
@@ -734,40 +768,62 @@ export default function Admin() {
         const lista = dados
 
         if (isFirstFetchRef.current) {
-          // Primeira carga: marca todos como "vistos" para não auto-imprimir histórico
-          lista.forEach(p => {
-            const id = p.numeroPedido || p.id
-            if (id) pedidosVistosRef.current.add(id)
-          })
-          localStorage.setItem('scooby_vistos', JSON.stringify([...pedidosVistosRef.current]))
+          // Primeira carga: salva TODOS os IDs como baseline — nenhum será tratado como novo
           isFirstFetchRef.current = false
+          pedidosVistosRef.current = new Set(lista.map(p => p.id))
         } else {
-          // Fetches subsequentes: detecta pedidos novos (não vistos)
-          const novos = lista.filter(p => {
-            const id = p.numeroPedido || p.id
-            return id && !pedidosVistosRef.current.has(id)
-          })
-          novos.forEach(p => {
-            const id = p.numeroPedido || p.id
-            pedidosVistosRef.current.add(id)
-            if (autoPrintRef.current) handleImprimirRef.current?.(p, 'auto')
-          })
+          // Polls subsequentes: detecta pedidos cujo ID não estava no baseline
+          const novos = lista.filter(p => !pedidosVistosRef.current.has(p.id))
           if (novos.length > 0) {
-            localStorage.setItem('scooby_vistos', JSON.stringify([...pedidosVistosRef.current]))
+            // Atualiza baseline com todos os IDs atuais
+            pedidosVistosRef.current = new Set(lista.map(p => p.id))
+            novos.forEach(p => {
+              if (autoPrintRef.current) handleImprimirRef.current?.(p, 'auto')
+            })
             setPedidosNovos(prev => {
               const next = new Set(prev)
               novos.forEach(p => next.add(p.numeroPedido || p.id))
               return next
             })
             tocarSomNotificacaoRef.current?.()
+            setDebugInfo(`🔔 ${novos.length} novo(s)! Total: ${lista.length}`)
+          } else {
+            setDebugInfo(`${lista.length} pedidos na API`)
           }
         }
 
-        setPedidos(lista)
+        // Mescla mesas abertas no topo da lista como entradas "em consumação"
+        try {
+          const resMesas = await fetch('/api/mesa')
+          if (resMesas.ok) {
+            const mesasData = await resMesas.json()
+            setMesas(mesasData)
+            const abertas = (mesasData || []).filter(m => m.status === 'aberta')
+            const mesasPedidos = abertas.map(m => ({
+              id: `mesa-${m.numero}`,
+              numeroPedido: `Mesa ${m.numero}`,
+              nomeCliente: `Mesa ${m.numero}`,
+              status: 'consumacao',
+              itensPedido: (m.itens || []).map(i => `${i.qtd}x ${i.nome}`).join(' | '),
+              total: Number(m.total).toFixed(2),
+              pagamento: '—',
+              tipoEntrega: 'Mesa',
+              criadoEm: m.aberta_em,
+              _mesaNumero: m.numero,
+            }))
+            setPedidos([...mesasPedidos, ...lista])
+          } else {
+            setPedidos(lista)
+          }
+        } catch {
+          setPedidos(lista)
+        }
+
         setUltimaAtualizacao(new Date().toLocaleTimeString('pt-BR'))
       }
     } catch (err) {
       console.error('Erro ao buscar pedidos:', err)
+      setDebugInfo(`Erro: ${err.message}`)
     }
   }, [])
 
@@ -789,6 +845,7 @@ export default function Admin() {
         setWhatsappEditado(estado.whatsappNumero || CONFIG.whatsappNumero)
         setPixChaveEditada(estado.pixChave || CONFIG.pixChave)
         setPixTipoEditado(estado.pixTipo || CONFIG.pixTipo)
+        if (estado.senhaGarcom) setSenhaGarcomEditada(estado.senhaGarcom)
         setPixNomeEditado(estado.pixNome || CONFIG.pixNome)
         setLojaStatus(estado.lojaStatus || 'auto')
         setBloqueados(estado.bloqueados || [])
@@ -815,6 +872,22 @@ export default function Admin() {
     const interval = setInterval(buscarPedidos, 15000)
     return () => clearInterval(interval)
   }, [autenticado, buscarPedidos])
+
+  // Auto-atualização: detecta novo deploy e avisa o admin
+  useEffect(() => {
+    let versaoAtual = null
+    async function checarVersao() {
+      try {
+        const r = await fetch('/api/version')
+        const { version } = await r.json()
+        if (!versaoAtual) { versaoAtual = version; return }
+        if (version !== versaoAtual) setNovaVersao(true)
+      } catch {}
+    }
+    checarVersao()
+    const id = setInterval(checarVersao, 60000)
+    return () => clearInterval(id)
+  }, [])
 
   function toggleDesativado(id) {
     setDesativadosEditados(prev =>
@@ -862,7 +935,7 @@ export default function Admin() {
       body: JSON.stringify({ tipo: 'alteracao_estrutural', descricao: solicitacaoTexto }),
     }).catch(() => {})
     const mensagem = encodeURIComponent(
-      `🍫 *SOLICITAÇÃO DE ALTERAÇÃO — Thalia Moreira Doces*\n` +
+      `🍔 *SOLICITAÇÃO DE ALTERAÇÃO — Scooby-Doo Lanches*\n` +
       `${'─'.repeat(28)}\n\n` +
       `${solicitacaoTexto}\n\n` +
       `_Enviado pelo painel administrativo_`
@@ -898,6 +971,7 @@ export default function Admin() {
           pixChave: pixChaveEditada.trim(),
           pixTipo: pixTipoEditado.trim(),
           pixNome: pixNomeEditado.trim(),
+          senhaGarcom: senhaGarcomEditada.trim() || 'garcom2024',
         })),
       })
       setMsgConfig('✅ Configurações salvas com sucesso!')
@@ -980,7 +1054,7 @@ export default function Admin() {
 
   // ── Impressora ────────────────────────────────────────────────
   const [nomeImpressora, setNomeImpressora] = useState(
-    localStorage.getItem('scooby_impressora') || 'KP-IM607'
+    localStorage.getItem('scooby_impressora') || 'ISD Tech 12'
   )
   const [mostrarGuiaImpressora, setMostrarGuiaImpressora] = useState(false)
   const [impressoraConectada, setImpressoraConectada] = useState(false)
@@ -1011,13 +1085,16 @@ export default function Admin() {
 
   // Conecta automaticamente ao abrir o painel
   useEffect(() => {
+    function configurarQZ() {
+      qz.security.setCertificatePromise((resolve) => resolve(CERTIFICATE))
+      qz.security.setSignatureAlgorithm('SHA512')
+      qz.security.setSignaturePromise((toSign) => (resolve, reject) =>
+        assinarQZ(toSign).then(resolve).catch(reject)
+      )
+    }
     async function autoConectar() {
       try {
-        qz.security.setCertificatePromise((resolve) => resolve(CERTIFICATE))
-        qz.security.setSignatureAlgorithm('SHA512')
-        qz.security.setSignaturePromise((toSign) => (resolve, reject) =>
-          assinarQZ(toSign).then(resolve).catch(reject)
-        )
+        configurarQZ()
         if (!qz.websocket.isActive()) await qz.websocket.connect()
         setImpressoraConectada(true)
       } catch {
@@ -1025,6 +1102,21 @@ export default function Admin() {
       }
     }
     autoConectar()
+
+    // Heartbeat: mantém conexão QZ ativa para auto-impressão funcionar
+    const heartbeat = setInterval(async () => {
+      if (!qz.websocket.isActive()) {
+        try {
+          configurarQZ()
+          await qz.websocket.connect()
+          setImpressoraConectada(true)
+        } catch {
+          setImpressoraConectada(false)
+        }
+      }
+    }, 20000) // verifica a cada 20s
+
+    return () => clearInterval(heartbeat)
   }, [])
 
   async function desconectarImpressora() {
@@ -1032,16 +1124,19 @@ export default function Admin() {
     setImpressoraConectada(false)
   }
 
-  async function imprimirEscPos(pedido) {
+  async function imprimirEscPos(pedido, tipo = 'manual') {
     // Se WebSocket caiu, tenta reconectar antes de imprimir
     if (!qz.websocket.isActive()) {
       try {
         await qz.websocket.connect()
         setImpressoraConectada(true)
       } catch {
-        // QZ Tray não está rodando — fallback para janela do browser
-        // (só funciona se chamado por clique do usuário, não por timer)
-        imprimirPedido(pedido)
+        // QZ Tray não está rodando
+        if (tipo === 'manual') {
+          // Fallback para janela do browser (funciona só com gesto do usuário)
+          imprimirPedido(pedido)
+        }
+        // Em auto-mode: não abre window.open (bloqueado pelo browser sem gesto)
         return
       }
     }
@@ -1055,25 +1150,21 @@ export default function Admin() {
       await qz.print(config, [{ type: 'raw', format: 'base64', data: btoa(bin) }])
     } catch (err) {
       console.error('Erro QZ Tray:', err)
-      imprimirPedido(pedido)
+      if (tipo === 'manual') imprimirPedido(pedido)
     }
   }
 
   // ── Auto-print ────────────────────────────────────────────────
-  // Padrão true: em nova instalação/PC/PWA, auto-impressão já vem ligada
-  const [autoPrint, setAutoPrint] = useState(() => {
-    const salvo = localStorage.getItem('scooby_autoprint')
-    return salvo === null ? true : salvo === 'true'
-  })
+  // Sempre começa ligado ao abrir o painel (não depende de localStorage)
+  // O botão só desliga durante a sessão atual
+  const [autoPrint, setAutoPrint] = useState(true)
   // pedidosImpressos: { [id]: { hora, tipo: 'auto'|'manual' } } — registros de impressão
   const [pedidosImpressos, setPedidosImpressos] = useState(
     () => JSON.parse(localStorage.getItem('scooby_impressos') || '{}')
   )
   const pedidosImpressosRef = useRef(pedidosImpressos)
   // pedidosVistosRef: Set de IDs já "vistos" na abertura do admin (não reimprimir histórico)
-  const pedidosVistosRef = useRef(
-    new Set(JSON.parse(localStorage.getItem('scooby_vistos') || '[]'))
-  )
+  const pedidosVistosRef = useRef(new Set())
   const autoPrintRef = useRef(autoPrint)
   const isFirstFetchRef = useRef(true)
   // handleImprimirRef: sempre aponta para a versão mais recente de handleImprimir,
@@ -1113,16 +1204,31 @@ export default function Admin() {
   useEffect(() => { pedidosImpressosRef.current = pedidosImpressos }, [pedidosImpressos])
 
   function toggleAutoPrint() {
-    const novo = !autoPrint
-    setAutoPrint(novo)
-    localStorage.setItem('scooby_autoprint', String(novo))
+    setAutoPrint(novo => !novo)
+  }
+
+  // Toca um bipe duplo quando chega pedido novo
+  function tocarAlerta() {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)()
+      ;[0, 220].forEach(delay => {
+        const osc = ctx.createOscillator()
+        const gain = ctx.createGain()
+        osc.connect(gain); gain.connect(ctx.destination)
+        osc.frequency.value = 880
+        gain.gain.setValueAtTime(0.4, ctx.currentTime + delay / 1000)
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + delay / 1000 + 0.3)
+        osc.start(ctx.currentTime + delay / 1000)
+        osc.stop(ctx.currentTime + delay / 1000 + 0.3)
+      })
+    } catch {}
   }
 
   async function handleImprimir(pedido, tipo = 'manual') {
     const id = pedido.numeroPedido || pedido.id
     if (!id) return
     try {
-      await imprimirEscPos(pedido)
+      await imprimirEscPos(pedido, tipo)
     } catch {
       // erro já logado dentro de imprimirEscPos
     }
@@ -1405,12 +1511,12 @@ export default function Admin() {
   // ── TELA DE LOGIN ─────────────────────────────────────────────
   if (!autenticado) {
     return (
-      <div className="min-h-screen bg-[#111111] flex items-center justify-center p-4">
-        <div className="bg-[#1e1e1e] border border-[#2e2e2e] rounded-2xl p-8 w-full max-w-sm">
+      <div className="min-h-screen bg-scooby-escuro flex items-center justify-center p-4">
+        <div className="bg-scooby-card border border-scooby-borda rounded-2xl p-8 w-full max-w-sm">
           <div className="text-center mb-6">
-            <img src="/logo-thalia.jpg" alt="Logo" className="w-20 h-20 object-contain mx-auto mb-3 rounded-full" />
+            <img src="/logo.png" alt="Logo" className="w-20 h-20 object-contain mx-auto mb-3 rounded-full" />
             <h1 className="text-scooby-amarelo font-bold text-xl">Painel Administrativo</h1>
-            <p className="text-gray-400 text-sm">Thalia Moreira Doces</p>
+            <p className="text-gray-400 text-sm">Scooby-Doo Lanches</p>
           </div>
           <form onSubmit={handleLogin} className="space-y-4">
             <input
@@ -1418,7 +1524,7 @@ export default function Admin() {
               placeholder="Senha"
               value={senha}
               onChange={e => setSenha(e.target.value)}
-              className="w-full bg-[#111111] border border-[#2e2e2e] text-white rounded-xl px-4 py-3 focus:outline-none focus:border-scooby-amarelo"
+              className="w-full bg-scooby-escuro border border-scooby-borda text-white rounded-xl px-4 py-3 focus:outline-none focus:border-scooby-amarelo"
             />
             <button className="w-full bg-scooby-vermelho hover:bg-red-700 text-white font-bold py-3 rounded-xl transition">
               Entrar
@@ -1431,24 +1537,34 @@ export default function Admin() {
 
   // ── PAINEL ADMIN ──────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-[#111111] text-white">
+    <div className="min-h-screen bg-scooby-escuro text-white">
+      {/* Banner nova versão */}
+      {novaVersao && (
+        <div className="bg-green-700 text-white text-sm font-semibold text-center py-2 px-4 flex items-center justify-center gap-3">
+          <span>🔄 Nova versão disponível!</span>
+          <button onClick={() => window.location.reload()} className="bg-white text-green-800 font-bold px-3 py-1 rounded-lg text-xs hover:bg-green-100 transition">
+            Atualizar agora
+          </button>
+        </div>
+      )}
       {/* Header */}
       <header className="bg-scooby-vermelho border-b-4 border-scooby-amarelo px-4 py-3">
         <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-2">
           {/* Logo + título */}
           <div className="flex items-center gap-2.5 min-w-0">
-            <img src="/logo-thalia.jpg" alt="Logo" className="w-8 h-8 sm:w-10 sm:h-10 rounded-full object-contain flex-shrink-0" />
+            <img src="/logo.png" alt="Logo" className="w-8 h-8 sm:w-10 sm:h-10 rounded-full object-contain flex-shrink-0" />
             <div className="min-w-0">
               <h1 className="text-scooby-amarelo font-bold text-sm sm:text-lg leading-tight">Painel Admin</h1>
               <p className="text-yellow-200 text-xs flex items-center gap-1">
                 {ultimaAtualizacao ? ultimaAtualizacao : 'Carregando...'}
                 <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse inline-block"></span>
               </p>
+              {debugInfo && <p className="text-gray-400 text-[10px] leading-tight">{debugInfo}</p>}
             </div>
           </div>
 
           {/* Status da loja */}
-          <div className="flex items-center bg-[#111111] border border-[#2e2e2e] rounded-xl p-0.5 gap-0.5">
+          <div className="flex items-center bg-scooby-escuro border border-scooby-borda rounded-xl p-0.5 gap-0.5">
             <button onClick={() => salvarStatusLoja('auto')} disabled={salvandoStatus}
               className={`text-xs font-bold px-2.5 py-1.5 rounded-lg transition disabled:opacity-60 ${lojaStatus === 'auto' ? 'bg-yellow-500 text-black' : 'text-gray-400'}`}>
               ⏰<span className="hidden sm:inline"> Auto</span>
@@ -1480,13 +1596,14 @@ export default function Admin() {
       </header>
 
       {/* Abas */}
-      <div className="bg-[#1e1e1e] border-b border-[#2e2e2e]">
+      <div className="bg-scooby-card border-b border-scooby-borda">
         <div className="max-w-7xl mx-auto px-2 overflow-x-auto" style={{ scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' }}>
           <div className="flex gap-0.5 pt-2 min-w-max">
             {[
               { id: 'pedidos',       label: '📋 Pedidos',        short: '📋' },
+              { id: 'mesas',         label: '🍽️ Mesas',          short: '🍽️' },
               { id: 'clientes',      label: '👥 Clientes',        short: '👥' },
-              { id: 'cardapio',      label: '🍫 Cardápio',        short: '🍫' },
+              { id: 'cardapio',      label: '🍔 Cardápio',        short: '🍔' },
               { id: 'combos',        label: '🎉 Combos & Cupons', short: '🎉' },
               { id: 'caixa',         label: '💰 Caixa',           short: '💰' },
               { id: 'configuracoes', label: '⚙️ Config',          short: '⚙️' },
@@ -1497,7 +1614,7 @@ export default function Admin() {
                 onClick={() => setAbaAtiva(aba.id)}
                 className={`flex-shrink-0 px-3 sm:px-5 py-2.5 rounded-t-xl font-semibold text-xs sm:text-sm transition border-b-2 whitespace-nowrap ${
                   abaAtiva === aba.id
-                    ? 'bg-[#111111] text-scooby-amarelo border-scooby-amarelo'
+                    ? 'bg-scooby-escuro text-scooby-amarelo border-scooby-amarelo'
                     : 'text-gray-400 hover:text-white border-transparent hover:bg-scooby-borda'
                 }`}
               >
@@ -1508,6 +1625,127 @@ export default function Admin() {
           </div>
         </div>
       </div>
+
+      {/* ── ABA MESAS ── */}
+      {abaAtiva === 'mesas' && (
+        <div className="max-w-4xl mx-auto px-4 py-6">
+          <div className="flex items-center justify-between mb-5">
+            <h2 className="text-white font-bold text-lg">Mesas</h2>
+            <button onClick={buscarMesas} className="text-gray-400 hover:text-white text-sm transition">↺ Atualizar</button>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+            {Array.from({ length: 10 }, (_, i) => i + 1).map(n => {
+              const m = mesas.find(x => x.numero === n)
+              const aberta = m?.status === 'aberta'
+              return (
+                <div key={n} className={`rounded-2xl border-2 p-4 flex flex-col gap-2 ${
+                  aberta ? 'border-yellow-500 bg-yellow-500/10' : 'border-scooby-borda bg-scooby-card'
+                }`}>
+                  <div className="flex items-center justify-between">
+                    <span className="text-white font-black text-2xl">{n}</span>
+                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                      aberta ? 'bg-yellow-500/20 text-yellow-400' : 'bg-gray-700 text-gray-500'
+                    }`}>{aberta ? 'Aberta' : 'Livre'}</span>
+                  </div>
+
+                  {aberta && m?.itens?.length > 0 && (
+                    <div className="space-y-0.5">
+                      {(m.itens || []).map((item, idx) => (
+                        <div key={idx} className="flex items-center justify-between text-xs">
+                          <span className="text-gray-300 truncate">{item.qtd}x {item.nome}{item.variacao ? ` (${item.variacao})` : ''}</span>
+                          <button
+                            onClick={async () => {
+                              await fetch(`/api/mesa?numero=${n}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'remover-item', itemIdx: idx }) })
+                              buscarMesas()
+                            }}
+                            className="text-gray-600 hover:text-red-400 ml-1 flex-shrink-0">×</button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {aberta && (
+                    <div className="mt-1 pt-2 border-t border-yellow-500/20">
+                      <p className="text-yellow-400 font-black text-base">R$ {Number(m?.total || 0).toFixed(2).replace('.', ',')}</p>
+                    </div>
+                  )}
+
+                  {aberta && (
+                    <div className="flex flex-col gap-1.5 mt-1">
+                      <button
+                        onClick={() => { setMesaFechando(n); setPagamentoMesa('Dinheiro'); setTrocoMesa('') }}
+                        className="w-full bg-green-700 hover:bg-green-600 text-white text-xs font-bold py-2 rounded-xl transition">
+                        💳 Fechar conta
+                      </button>
+                      <button
+                        onClick={() => resetarMesa(n)}
+                        className="w-full bg-scooby-borda hover:bg-red-900 text-gray-400 hover:text-white text-xs py-1.5 rounded-xl transition">
+                        Resetar
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+
+          {/* Modal fechar conta */}
+          {mesaFechando && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70">
+              <div className="bg-scooby-card border border-scooby-borda rounded-2xl p-6 w-full max-w-sm">
+                <h3 className="text-white font-bold text-lg mb-1">Fechar conta — Mesa {mesaFechando}</h3>
+                <p className="text-yellow-400 font-black text-xl mb-4">
+                  R$ {Number(mesas.find(x => x.numero === mesaFechando)?.total || 0).toFixed(2).replace('.', ',')}
+                </p>
+
+                <p className="text-gray-400 text-sm mb-2">Forma de pagamento</p>
+                <div className="grid grid-cols-2 gap-2 mb-4">
+                  {[
+                    { id: 'Dinheiro', emoji: '💵' },
+                    { id: 'Pix', emoji: '📲' },
+                    { id: 'Cartão de Débito', emoji: '💳' },
+                    { id: 'Cartão de Crédito', emoji: '💳' },
+                  ].map(p => (
+                    <button key={p.id} onClick={() => setPagamentoMesa(p.id)}
+                      className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border text-sm font-semibold transition ${
+                        pagamentoMesa === p.id
+                          ? 'border-yellow-400 bg-yellow-400/10 text-white'
+                          : 'border-scooby-borda bg-scooby-escuro text-gray-400'
+                      }`}>
+                      <span>{p.emoji}</span>{p.id.replace('Cartão de ', '')}
+                    </button>
+                  ))}
+                </div>
+
+                {pagamentoMesa === 'Dinheiro' && (
+                  <div className="mb-4">
+                    <label className="text-gray-400 text-xs block mb-1">Troco para (opcional)</label>
+                    <input
+                      type="text" placeholder="Ex: 50,00" value={trocoMesa}
+                      onChange={e => setTrocoMesa(e.target.value)}
+                      className="w-full bg-scooby-escuro border border-scooby-borda text-white rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-scooby-amarelo"
+                    />
+                  </div>
+                )}
+
+                <div className="flex gap-2">
+                  <button onClick={() => setMesaFechando(null)}
+                    className="flex-1 bg-scooby-borda hover:bg-gray-700 text-white py-3 rounded-xl text-sm transition">
+                    Cancelar
+                  </button>
+                  <button onClick={fecharMesa} disabled={fechandoMesa}
+                    className={`flex-1 font-bold py-3 rounded-xl text-sm transition ${
+                      fechandoMesa ? 'bg-gray-700 text-gray-400' : 'bg-green-700 hover:bg-green-600 text-white'
+                    }`}>
+                    {fechandoMesa ? 'Fechando...' : '✅ Confirmar'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ── ABA PEDIDOS ── */}
       {abaAtiva === 'pedidos' && (
@@ -1554,7 +1792,7 @@ export default function Admin() {
           </div>
 
           {/* Filtros */}
-          <div className="bg-[#1e1e1e] border border-[#2e2e2e] rounded-2xl p-4 flex flex-wrap gap-3 items-end">
+          <div className="bg-scooby-card border border-scooby-borda rounded-2xl p-4 flex flex-wrap gap-3 items-end">
             {/* Filtro rápido */}
             <div>
               <p className="text-gray-500 text-xs mb-1.5">Período</p>
@@ -1566,7 +1804,7 @@ export default function Admin() {
                     className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition ${
                       filtroRapido === val
                         ? 'bg-scooby-amarelo text-black'
-                        : 'bg-[#111111] text-gray-400 hover:text-white border border-[#2e2e2e]'
+                        : 'bg-scooby-escuro text-gray-400 hover:text-white border border-scooby-borda'
                     }`}
                   >
                     {label}
@@ -1583,7 +1821,7 @@ export default function Admin() {
                 placeholder="dd/mm/aaaa"
                 value={dataFiltro}
                 onChange={e => { setDataFiltro(e.target.value); setFiltroRapido('') }}
-                className="bg-[#111111] border border-[#2e2e2e] text-white rounded-xl px-3 py-1.5 text-sm focus:outline-none focus:border-scooby-amarelo w-32"
+                className="bg-scooby-escuro border border-scooby-borda text-white rounded-xl px-3 py-1.5 text-sm focus:outline-none focus:border-scooby-amarelo w-32"
               />
             </div>
 
@@ -1593,7 +1831,7 @@ export default function Admin() {
               <select
                 value={pagamentoFiltro}
                 onChange={e => setPagamentoFiltro(e.target.value)}
-                className="bg-[#111111] border border-[#2e2e2e] text-white rounded-xl px-3 py-1.5 text-sm focus:outline-none focus:border-scooby-amarelo"
+                className="bg-scooby-escuro border border-scooby-borda text-white rounded-xl px-3 py-1.5 text-sm focus:outline-none focus:border-scooby-amarelo"
               >
                 <option value="">Todos</option>
                 <option value="Pix">Pix</option>
@@ -1770,7 +2008,7 @@ export default function Admin() {
               placeholder="Buscar por nome ou telefone..."
               value={buscaCliente}
               onChange={e => setBuscaCliente(e.target.value)}
-              className="bg-[#111111] border border-[#2e2e2e] text-white rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-scooby-amarelo w-64"
+              className="bg-scooby-escuro border border-scooby-borda text-white rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-scooby-amarelo w-64"
             />
           </div>
 
@@ -1842,7 +2080,7 @@ export default function Admin() {
           </div>
 
           {/* Taxa de entrega + Tempo */}
-          <div className="bg-[#1e1e1e] border border-[#2e2e2e] rounded-2xl p-5 space-y-4">
+          <div className="bg-scooby-card border border-scooby-borda rounded-2xl p-5 space-y-4">
             <div>
               <h3 className="text-scooby-amarelo font-bold text-sm mb-3">🚗 Taxa de Entrega</h3>
               <div className="flex items-center gap-3">
@@ -1853,12 +2091,12 @@ export default function Admin() {
                   min="0"
                   value={taxaEntregaEditada}
                   onChange={e => setTaxaEntregaEditada(e.target.value)}
-                  className="w-28 bg-[#111111] border border-[#2e2e2e] text-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-scooby-amarelo"
+                  className="w-28 bg-scooby-escuro border border-scooby-borda text-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-scooby-amarelo"
                 />
                 <span className="text-gray-500 text-xs">por entrega (atual: R$ {Number(taxaEntregaEditada).toFixed(2).replace('.', ',')})</span>
               </div>
             </div>
-            <div className="border-t border-[#2e2e2e] pt-4">
+            <div className="border-t border-scooby-borda pt-4">
               <h3 className="text-scooby-amarelo font-bold text-sm mb-3">⏱ Tempo de Entrega</h3>
               <div className="flex items-center gap-3">
                 <input
@@ -1866,13 +2104,13 @@ export default function Admin() {
                   placeholder="Ex: 40 a 60 min"
                   value={tempoEntregaEditado}
                   onChange={e => setTempoEntregaEditado(e.target.value)}
-                  className="w-48 bg-[#111111] border border-[#2e2e2e] text-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-scooby-amarelo"
+                  className="w-48 bg-scooby-escuro border border-scooby-borda text-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-scooby-amarelo"
                 />
                 <span className="text-gray-500 text-xs">aparece no cabeçalho do site</span>
               </div>
             </div>
 
-            <div className="border-t border-[#2e2e2e] pt-4">
+            <div className="border-t border-scooby-borda pt-4">
               <h3 className="text-scooby-amarelo font-bold text-sm mb-1">🕐 Horário de Funcionamento</h3>
               <p className="text-gray-500 text-xs mb-3">Usado quando o status está em <span className="text-yellow-400 font-semibold">⏰ Auto</span></p>
               <div className="flex items-center gap-3 flex-wrap">
@@ -1882,7 +2120,7 @@ export default function Admin() {
                     type="time"
                     value={horarioAberturaEditado}
                     onChange={e => setHorarioAberturaEditado(e.target.value)}
-                    className="bg-[#111111] border border-[#2e2e2e] text-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-scooby-amarelo"
+                    className="bg-scooby-escuro border border-scooby-borda text-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-scooby-amarelo"
                   />
                 </div>
                 <div className="flex items-center gap-2">
@@ -1891,7 +2129,7 @@ export default function Admin() {
                     type="time"
                     value={horarioFechamentoEditado}
                     onChange={e => setHorarioFechamentoEditado(e.target.value)}
-                    className="bg-[#111111] border border-[#2e2e2e] text-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-scooby-amarelo"
+                    className="bg-scooby-escuro border border-scooby-borda text-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-scooby-amarelo"
                   />
                 </div>
                 <span className="text-gray-500 text-xs">salvo junto com "Salvar alterações"</span>
@@ -1907,7 +2145,7 @@ export default function Admin() {
                       className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition ${
                         diasFuncionamento.includes(i)
                           ? 'bg-scooby-amarelo text-black border-scooby-amarelo'
-                          : 'bg-[#111111] text-gray-500 border-[#2e2e2e] hover:border-gray-400'
+                          : 'bg-scooby-escuro text-gray-500 border-scooby-borda hover:border-gray-400'
                       }`}
                     >{dia}</button>
                   ))}
@@ -1917,7 +2155,7 @@ export default function Admin() {
           </div>
 
           {categorias.map(cat => (
-            <div key={cat.id} className="bg-[#1e1e1e] border border-[#2e2e2e] rounded-2xl overflow-hidden">
+            <div key={cat.id} className="bg-scooby-card border border-scooby-borda rounded-2xl overflow-hidden">
               <div className="bg-scooby-borda px-5 py-3">
                 <h3 className="text-scooby-amarelo font-bold text-sm">{cat.nome}</h3>
               </div>
@@ -1956,7 +2194,7 @@ export default function Admin() {
                               min="0"
                               value={precoAtual}
                               onChange={e => handlePrecoChange(item.id, e.target.value)}
-                              className="w-24 bg-[#111111] border border-[#2e2e2e] text-white rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-scooby-amarelo text-right"
+                              className="w-24 bg-scooby-escuro border border-scooby-borda text-white rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-scooby-amarelo text-right"
                             />
                           </div>
                         )}
@@ -1984,7 +2222,7 @@ export default function Admin() {
                                   min="0"
                                   value={precoV}
                                   onChange={e => handlePrecoVariacaoChange(item.id, v.label, e.target.value)}
-                                  className="w-20 bg-[#111111] border border-[#2e2e2e] text-white rounded-lg px-2 py-1 text-xs focus:outline-none focus:border-scooby-amarelo text-right"
+                                  className="w-20 bg-scooby-escuro border border-scooby-borda text-white rounded-lg px-2 py-1 text-xs focus:outline-none focus:border-scooby-amarelo text-right"
                                 />
                               </div>
                             )
@@ -2000,7 +2238,7 @@ export default function Admin() {
 
 
           {/* Adicionais */}
-          <div className="bg-[#1e1e1e] border border-[#2e2e2e] rounded-2xl overflow-hidden">
+          <div className="bg-scooby-card border border-scooby-borda rounded-2xl overflow-hidden">
             <div className="bg-scooby-borda px-5 py-3">
               <h3 className="text-scooby-amarelo font-bold text-sm">🍗 Adicionais</h3>
             </div>
@@ -2031,7 +2269,7 @@ export default function Admin() {
                           min="0"
                           value={precoAtual}
                           onChange={e => handlePrecoChange(ad.id, e.target.value)}
-                          className="w-24 bg-[#111111] border border-[#2e2e2e] text-white rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-scooby-amarelo text-right"
+                          className="w-24 bg-scooby-escuro border border-scooby-borda text-white rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-scooby-amarelo text-right"
                         />
                       </div>
                       <span className={`flex-shrink-0 text-xs font-semibold px-2.5 py-1 rounded-full ${ativo ? 'bg-green-900 text-green-400' : 'bg-gray-800 text-gray-500'}`}>
@@ -2045,7 +2283,7 @@ export default function Admin() {
           </div>
 
           {/* Solicitar alteração */}
-          <div className="bg-[#1e1e1e] border border-[#2e2e2e] rounded-2xl p-6 space-y-4">
+          <div className="bg-scooby-card border border-scooby-borda rounded-2xl p-6 space-y-4">
             <h3 className="text-scooby-amarelo font-bold text-base">Solicitar alteração ao desenvolvedor</h3>
             <p className="text-gray-400 text-sm">
               Para alterações estruturais (novos itens, categorias, alteração de nome, etc.), envie uma solicitação via WhatsApp.
@@ -2053,9 +2291,9 @@ export default function Admin() {
             <textarea
               value={solicitacaoTexto}
               onChange={e => setSolicitacaoTexto(e.target.value)}
-              placeholder="Ex: Adicionar novo produto 'Trufa de Morango' por R$ 5,00 com chocolate belga e recheio de morango."
+              placeholder="Ex: Adicionar novo hamburguer 'Scooby Especial' por R$ 35,00 com pão brioche, bife artesanal, cheddar e bacon."
               rows={4}
-              className="w-full bg-[#111111] border border-[#2e2e2e] text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-scooby-amarelo resize-none"
+              className="w-full bg-scooby-escuro border border-scooby-borda text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-scooby-amarelo resize-none"
             />
             <button
               onClick={enviarSolicitacao}
@@ -2097,18 +2335,19 @@ export default function Admin() {
           </div>
 
           {/* Promoções do Dia */}
-          <div className="bg-[#1e1e1e] border border-[#2e2e2e] rounded-2xl overflow-hidden">
+          <div className="bg-scooby-card border border-scooby-borda rounded-2xl overflow-hidden">
             <div className="bg-scooby-borda px-5 py-3 flex items-center justify-between">
               <h3 className="text-scooby-amarelo font-bold text-sm">🎉 Promoções / Combos do Dia</h3>
               <button
-                onClick={() => setPromocoesEditadas(prev => [...prev, {
+                onClick={() => setPromocoesEditadas(prev => [{
                   id: Date.now().toString(36),
                   nome: '',
                   itens: [{ quantidade: 1, itemId: todosItensFlat[0]?.id || '', label: todosItensFlat[0]?.nome || '' }],
+                  adicionais: [],
                   precoCombo: '',
                   descricao: '',
                   ativo: true
-                }])}
+                }, ...prev])}
                 className="bg-scooby-vermelho hover:bg-red-700 text-white text-xs font-bold px-3 py-1 rounded-lg transition"
               >+ Novo combo</button>
             </div>
@@ -2117,7 +2356,7 @@ export default function Admin() {
                 <p className="text-gray-500 text-sm text-center py-2">Nenhum combo cadastrado.</p>
               )}
               {promocoesEditadas.map((promo, idx) => (
-                <div key={promo.id} className="bg-[#111111] border border-[#2e2e2e] rounded-xl p-4 space-y-3">
+                <div key={promo.id} className="bg-scooby-escuro border border-scooby-borda rounded-xl p-4 space-y-3">
                   <div className="flex items-center gap-3">
                     <button
                       onClick={() => setPromocoesEditadas(prev => prev.map((p, i) => i === idx ? { ...p, ativo: !p.ativo } : p))}
@@ -2133,7 +2372,7 @@ export default function Admin() {
                       placeholder="Nome do combo (ex: Combo do Dia)"
                       value={promo.nome}
                       onChange={e => setPromocoesEditadas(prev => prev.map((p, i) => i === idx ? { ...p, nome: e.target.value } : p))}
-                      className="flex-1 bg-[#1e1e1e] border border-[#2e2e2e] text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-scooby-amarelo"
+                      className="flex-1 bg-scooby-card border border-scooby-borda text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-scooby-amarelo"
                     />
                     <button
                       onClick={() => setPromocoesEditadas(prev => prev.filter((_, i) => i !== idx))}
@@ -2162,10 +2401,14 @@ export default function Admin() {
                             const selected = todosItensFlat.find(it => String(it.id) === e.target.value)
                             setPromocoesEditadas(prev => prev.map((p, i) => i === idx ? { ...p, itens: p.itens.map((it, ii) => ii === itemIdx ? { ...it, itemId: selected?.id || e.target.value, label: selected?.nome || '' } : it) } : p))
                           }}
-                          className="flex-1 min-w-0 bg-[#1e1e1e] border border-[#2e2e2e] text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-scooby-amarelo"
+                          className="flex-1 min-w-0 bg-scooby-card border border-scooby-borda text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-scooby-amarelo"
                         >
-                          {todosItensFlat.map(item => (
-                            <option key={item.id} value={item.id}>{item.nome}</option>
+                          {categorias.map(cat => (
+                            <optgroup key={cat.id} label={cat.nome}>
+                              {cat.itens.map(item => (
+                                <option key={item.id} value={item.id}>{item.nome}</option>
+                              ))}
+                            </optgroup>
                           ))}
                         </select>
                         {promo.itens.length > 1 && (
@@ -2181,6 +2424,36 @@ export default function Admin() {
                       className="text-scooby-amarelo hover:text-yellow-300 text-xs font-semibold transition"
                     >+ Adicionar item ao combo</button>
                   </div>
+                  <div className="space-y-2">
+                    <label className="text-gray-400 text-xs block">Adicionais opcionais (ex: Catupiry, Bacon extra):</label>
+                    {(promo.adicionais || []).map((ad, adIdx) => (
+                      <div key={adIdx} className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          placeholder="Nome do adicional (ex: Catupiry)"
+                          value={ad.nome}
+                          onChange={e => setPromocoesEditadas(prev => prev.map((p, i) => i === idx ? { ...p, adicionais: p.adicionais.map((a, ai) => ai === adIdx ? { ...a, nome: e.target.value } : a) } : p))}
+                          className="flex-1 bg-scooby-card border border-scooby-borda text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-scooby-amarelo"
+                        />
+                        <span className="text-gray-500 text-xs flex-shrink-0">+R$</span>
+                        <input
+                          type="number" step="0.01" min="0"
+                          placeholder="0,00"
+                          value={ad.preco}
+                          onChange={e => setPromocoesEditadas(prev => prev.map((p, i) => i === idx ? { ...p, adicionais: p.adicionais.map((a, ai) => ai === adIdx ? { ...a, preco: e.target.value } : a) } : p))}
+                          className="w-24 bg-scooby-card border border-scooby-borda text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-scooby-amarelo text-right"
+                        />
+                        <button
+                          onClick={() => setPromocoesEditadas(prev => prev.map((p, i) => i === idx ? { ...p, adicionais: p.adicionais.filter((_, ai) => ai !== adIdx) } : p))}
+                          className="text-gray-600 hover:text-red-400 text-lg leading-none transition flex-shrink-0"
+                        >×</button>
+                      </div>
+                    ))}
+                    <button
+                      onClick={() => setPromocoesEditadas(prev => prev.map((p, i) => i === idx ? { ...p, adicionais: [...(p.adicionais || []), { nome: '', preco: '' }] } : p))}
+                      className="text-blue-400 hover:text-blue-300 text-xs font-semibold transition"
+                    >+ Adicional (ex: Catupiry)</button>
+                  </div>
                   <div className="flex gap-3">
                     <div className="w-40 flex-shrink-0">
                       <label className="text-gray-400 text-xs mb-1 block">Preço do combo (R$)</label>
@@ -2189,7 +2462,7 @@ export default function Admin() {
                         placeholder="Ex: 45.00"
                         value={promo.precoCombo}
                         onChange={e => setPromocoesEditadas(prev => prev.map((p, i) => i === idx ? { ...p, precoCombo: e.target.value } : p))}
-                        className="w-full bg-[#1e1e1e] border border-[#2e2e2e] text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-scooby-amarelo"
+                        className="w-full bg-scooby-card border border-scooby-borda text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-scooby-amarelo"
                       />
                     </div>
                     <div className="flex-1">
@@ -2199,13 +2472,17 @@ export default function Admin() {
                         placeholder="Ex: Válido apenas hoje!"
                         value={promo.descricao}
                         onChange={e => setPromocoesEditadas(prev => prev.map((p, i) => i === idx ? { ...p, descricao: e.target.value } : p))}
-                        className="w-full bg-[#1e1e1e] border border-[#2e2e2e] text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-scooby-amarelo"
+                        className="w-full bg-scooby-card border border-scooby-borda text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-scooby-amarelo"
                       />
                     </div>
                   </div>
                   {promo.nome && promo.precoCombo && (
-                    <div className="bg-[#1e1e1e] rounded-lg px-3 py-2 text-xs text-gray-400">
-                      Preview: <span className="text-scooby-amarelo font-semibold">{promo.nome}</span> — {promo.itens.map(it => `${it.quantidade}x ${it.label || todosItensFlat.find(f => String(f.id) === String(it.itemId))?.nome || ''}`).join(' + ')} por <span className="text-green-400 font-bold">R$ {Number(promo.precoCombo).toFixed(2).replace('.', ',')}</span>
+                    <div className="bg-scooby-card rounded-lg px-3 py-2 text-xs text-gray-400">
+                      Preview: <span className="text-scooby-amarelo font-semibold">{promo.nome}</span> — {promo.itens.map(it => `${it.quantidade}x ${it.label || todosItensFlat.find(f => String(f.id) === String(it.itemId))?.nome || ''}`).join(' + ')}
+                      {(promo.adicionais || []).filter(a => a.nome).length > 0 && (
+                        <span className="text-orange-300"> + {promo.adicionais.filter(a => a.nome).map(a => `${a.nome}${a.preco ? ` (+R$ ${Number(a.preco).toFixed(2).replace('.', ',')})` : ''}`).join(', ')}</span>
+                      )}
+                      {' '}por <span className="text-green-400 font-bold">R$ {Number(promo.precoCombo).toFixed(2).replace('.', ',')}</span>
                     </div>
                   )}
                 </div>
@@ -2214,11 +2491,11 @@ export default function Admin() {
           </div>
 
           {/* Cupons de Desconto */}
-          <div className="bg-[#1e1e1e] border border-[#2e2e2e] rounded-2xl overflow-hidden">
+          <div className="bg-scooby-card border border-scooby-borda rounded-2xl overflow-hidden">
             <div className="bg-scooby-borda px-5 py-3 flex items-center justify-between">
               <h3 className="text-scooby-amarelo font-bold text-sm">🎟 Cupons de Desconto</h3>
               <button
-                onClick={() => setCuponsEditados(prev => [...prev, { id: Date.now().toString(36), codigo: '', tipo: 'percentual', valor: '', ativo: true }])}
+                onClick={() => setCuponsEditados(prev => [{ id: Date.now().toString(36), codigo: '', tipo: 'percentual', valor: '', ativo: true }, ...prev])}
                 className="bg-scooby-vermelho hover:bg-red-700 text-white text-xs font-bold px-3 py-1 rounded-lg transition"
               >+ Novo cupom</button>
             </div>
@@ -2227,7 +2504,7 @@ export default function Admin() {
                 <p className="text-gray-500 text-sm text-center py-2">Nenhum cupom cadastrado.</p>
               )}
               {cuponsEditados.map((cupom, idx) => (
-                <div key={cupom.id} className="bg-[#111111] border border-[#2e2e2e] rounded-xl p-4">
+                <div key={cupom.id} className="bg-scooby-escuro border border-scooby-borda rounded-xl p-4">
                   <div className="flex items-center gap-3 flex-wrap">
                     <button
                       onClick={() => setCuponsEditados(prev => prev.map((c, i) => i === idx ? { ...c, ativo: !c.ativo } : c))}
@@ -2237,15 +2514,15 @@ export default function Admin() {
                     </button>
                     <input
                       type="text"
-                      placeholder="Código (ex: THALIA10)"
+                      placeholder="Código (ex: SCOOBY10)"
                       value={cupom.codigo}
                       onChange={e => setCuponsEditados(prev => prev.map((c, i) => i === idx ? { ...c, codigo: e.target.value.toUpperCase() } : c))}
-                      className="flex-1 min-w-0 bg-[#1e1e1e] border border-[#2e2e2e] text-white rounded-lg px-3 py-2 text-sm font-mono uppercase focus:outline-none focus:border-scooby-amarelo"
+                      className="flex-1 min-w-0 bg-scooby-card border border-scooby-borda text-white rounded-lg px-3 py-2 text-sm font-mono uppercase focus:outline-none focus:border-scooby-amarelo"
                     />
                     <select
                       value={cupom.tipo}
                       onChange={e => setCuponsEditados(prev => prev.map((c, i) => i === idx ? { ...c, tipo: e.target.value } : c))}
-                      className="bg-[#1e1e1e] border border-[#2e2e2e] text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-scooby-amarelo"
+                      className="bg-scooby-card border border-scooby-borda text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-scooby-amarelo"
                     >
                       <option value="percentual">% desconto</option>
                       <option value="fixo">R$ fixo</option>
@@ -2255,7 +2532,7 @@ export default function Admin() {
                       placeholder={cupom.tipo === 'percentual' ? 'Ex: 10' : 'Ex: 5.00'}
                       value={cupom.valor}
                       onChange={e => setCuponsEditados(prev => prev.map((c, i) => i === idx ? { ...c, valor: e.target.value } : c))}
-                      className="w-24 bg-[#1e1e1e] border border-[#2e2e2e] text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-scooby-amarelo text-right"
+                      className="w-24 bg-scooby-card border border-scooby-borda text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-scooby-amarelo text-right"
                     />
                     <span className="text-gray-500 text-sm">{cupom.tipo === 'percentual' ? '%' : 'R$'}</span>
                     <button
@@ -2270,7 +2547,7 @@ export default function Admin() {
                         type="datetime-local"
                         value={cupom.validadeAte || ''}
                         onChange={e => setCuponsEditados(prev => prev.map((c, i) => i === idx ? { ...c, validadeAte: e.target.value } : c))}
-                        className="bg-[#1e1e1e] border border-[#2e2e2e] text-white rounded-lg px-2 py-1 text-xs focus:outline-none focus:border-scooby-amarelo"
+                        className="bg-scooby-card border border-scooby-borda text-white rounded-lg px-2 py-1 text-xs focus:outline-none focus:border-scooby-amarelo"
                       />
                       {cupom.validadeAte && (
                         <button
@@ -2311,7 +2588,7 @@ export default function Admin() {
         <div className="max-w-xl mx-auto px-4 py-6 space-y-6">
 
           {/* WhatsApp */}
-          <div className="bg-[#1e1e1e] border border-[#2e2e2e] rounded-2xl p-5 space-y-4">
+          <div className="bg-scooby-card border border-scooby-borda rounded-2xl p-5 space-y-4">
             <div className="flex items-center gap-3 mb-1">
               <span className="text-2xl">📱</span>
               <div>
@@ -2326,14 +2603,36 @@ export default function Admin() {
                 placeholder="5532999301657"
                 value={whatsappEditado}
                 onChange={e => setWhatsappEditado(e.target.value.replace(/\D/g, ''))}
-                className="w-full bg-[#111111] border border-[#2e2e2e] text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-scooby-amarelo font-mono"
+                className="w-full bg-scooby-escuro border border-scooby-borda text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-scooby-amarelo font-mono"
               />
               <p className="text-gray-500 text-xs mt-1">Somente números. Ex: 5532999301657</p>
             </div>
           </div>
 
+          {/* Senha Garçom */}
+          <div className="bg-scooby-card border border-scooby-borda rounded-2xl p-5 space-y-4">
+            <div className="flex items-center gap-3 mb-1">
+              <span className="text-2xl">🍽️</span>
+              <div>
+                <h3 className="text-scooby-amarelo font-bold text-base">Senha do Garçom</h3>
+                <p className="text-gray-500 text-xs">Senha para acessar a página /garcom</p>
+              </div>
+            </div>
+            <div>
+              <label className="text-gray-300 text-sm font-medium block mb-1">Senha</label>
+              <input
+                type="text"
+                placeholder="garcom2024"
+                value={senhaGarcomEditada}
+                onChange={e => setSenhaGarcomEditada(e.target.value)}
+                className="w-full bg-scooby-escuro border border-scooby-borda text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-scooby-amarelo font-mono"
+              />
+              <p className="text-gray-500 text-xs mt-1">Link do garçom: <span className="text-gray-300 font-mono">scoobydoolanches.com.br/garcom</span></p>
+            </div>
+          </div>
+
           {/* Pix */}
-          <div className="bg-[#1e1e1e] border border-[#2e2e2e] rounded-2xl p-5 space-y-4">
+          <div className="bg-scooby-card border border-scooby-borda rounded-2xl p-5 space-y-4">
             <div className="flex items-center gap-3 mb-1">
               <span className="text-2xl">💠</span>
               <div>
@@ -2348,7 +2647,7 @@ export default function Admin() {
                 placeholder="CPF, CNPJ, e-mail, telefone ou chave aleatória"
                 value={pixChaveEditada}
                 onChange={e => setPixChaveEditada(e.target.value)}
-                className="w-full bg-[#111111] border border-[#2e2e2e] text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-scooby-amarelo"
+                className="w-full bg-scooby-escuro border border-scooby-borda text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-scooby-amarelo"
               />
             </div>
             <div className="grid grid-cols-2 gap-3">
@@ -2357,7 +2656,7 @@ export default function Admin() {
                 <select
                   value={pixTipoEditado}
                   onChange={e => setPixTipoEditado(e.target.value)}
-                  className="w-full bg-[#111111] border border-[#2e2e2e] text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-scooby-amarelo"
+                  className="w-full bg-scooby-escuro border border-scooby-borda text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-scooby-amarelo"
                 >
                   <option>Telefone</option>
                   <option>CPF</option>
@@ -2373,14 +2672,14 @@ export default function Admin() {
                   placeholder="Nome no Pix"
                   value={pixNomeEditado}
                   onChange={e => setPixNomeEditado(e.target.value)}
-                  className="w-full bg-[#111111] border border-[#2e2e2e] text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-scooby-amarelo"
+                  className="w-full bg-scooby-escuro border border-scooby-borda text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-scooby-amarelo"
                 />
               </div>
             </div>
 
             {/* Prévia */}
             {pixChaveEditada && (
-              <div className="bg-[#111111] rounded-xl p-4">
+              <div className="bg-scooby-escuro rounded-xl p-4">
                 <p className="text-gray-500 text-xs mb-2">Prévia — como o cliente verá:</p>
                 <p className="text-white font-mono text-sm">{pixChaveEditada}</p>
                 <p className="text-gray-400 text-xs mt-0.5">{pixNomeEditado} · {pixTipoEditado}</p>
@@ -2389,7 +2688,7 @@ export default function Admin() {
           </div>
 
           {/* Horário + Entrega */}
-          <div className="bg-[#1e1e1e] border border-[#2e2e2e] rounded-2xl p-5 space-y-4">
+          <div className="bg-scooby-card border border-scooby-borda rounded-2xl p-5 space-y-4">
             <div className="flex items-center gap-3 mb-1">
               <span className="text-2xl">🕐</span>
               <div>
@@ -2404,7 +2703,7 @@ export default function Admin() {
                   type="time"
                   value={horarioAberturaEditado}
                   onChange={e => setHorarioAberturaEditado(e.target.value)}
-                  className="w-full bg-[#111111] border border-[#2e2e2e] text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-scooby-amarelo"
+                  className="w-full bg-scooby-escuro border border-scooby-borda text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-scooby-amarelo"
                 />
               </div>
               <div>
@@ -2413,7 +2712,7 @@ export default function Admin() {
                   type="time"
                   value={horarioFechamentoEditado}
                   onChange={e => setHorarioFechamentoEditado(e.target.value)}
-                  className="w-full bg-[#111111] border border-[#2e2e2e] text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-scooby-amarelo"
+                  className="w-full bg-scooby-escuro border border-scooby-borda text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-scooby-amarelo"
                 />
               </div>
             </div>
@@ -2428,7 +2727,7 @@ export default function Admin() {
                     className={`px-3 py-2 rounded-xl text-sm font-bold border transition ${
                       diasFuncionamento.includes(i)
                         ? 'bg-scooby-amarelo text-black border-scooby-amarelo'
-                        : 'bg-[#111111] text-gray-500 border-[#2e2e2e] hover:border-gray-400'
+                        : 'bg-scooby-escuro text-gray-500 border-scooby-borda hover:border-gray-400'
                     }`}
                   >{dia}</button>
                 ))}
@@ -2441,7 +2740,7 @@ export default function Admin() {
                   type="number"
                   value={taxaEntregaEditada}
                   onChange={e => setTaxaEntregaEditada(e.target.value)}
-                  className="w-full bg-[#111111] border border-[#2e2e2e] text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-scooby-amarelo"
+                  className="w-full bg-scooby-escuro border border-scooby-borda text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-scooby-amarelo"
                   step="0.50" min="0"
                 />
               </div>
@@ -2452,14 +2751,14 @@ export default function Admin() {
                   placeholder="Ex: 40 a 60 min"
                   value={tempoEntregaEditado}
                   onChange={e => setTempoEntregaEditado(e.target.value)}
-                  className="w-full bg-[#111111] border border-[#2e2e2e] text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-scooby-amarelo"
+                  className="w-full bg-scooby-escuro border border-scooby-borda text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-scooby-amarelo"
                 />
               </div>
             </div>
           </div>
 
           {/* Impressora */}
-          <div className="bg-[#1e1e1e] border border-[#2e2e2e] rounded-2xl p-5 space-y-4">
+          <div className="bg-scooby-card border border-scooby-borda rounded-2xl p-5 space-y-4">
             <div className="flex items-center gap-3 mb-1">
               <span className="text-2xl">🖨️</span>
               <div>
@@ -2475,14 +2774,14 @@ export default function Admin() {
                 placeholder="Ex: PSO58, XP-58, POS-58"
                 value={nomeImpressora}
                 onChange={e => salvarNomeImpressora(e.target.value)}
-                className="w-full bg-[#111111] border border-[#2e2e2e] text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-scooby-amarelo font-mono"
+                className="w-full bg-scooby-escuro border border-scooby-borda text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-scooby-amarelo font-mono"
               />
               <p className="text-gray-500 text-xs mt-1">
                 Digite exatamente o nome que aparece no Windows (Painel de Controle → Dispositivos e Impressoras).
               </p>
             </div>
 
-            <div className="flex items-center gap-3 p-3 bg-[#111111] rounded-xl border border-[#2e2e2e]">
+            <div className="flex items-center gap-3 p-3 bg-scooby-escuro rounded-xl border border-scooby-borda">
               {impressoraConectada ? (
                 <button
                   onClick={desconectarImpressora}
@@ -2520,7 +2819,7 @@ export default function Admin() {
             </div>
 
             {mostrarGuiaImpressora && (
-              <div className="bg-[#111111] rounded-xl p-4 space-y-3 text-sm">
+              <div className="bg-scooby-escuro rounded-xl p-4 space-y-3 text-sm">
                 <p className="text-scooby-amarelo font-bold">Como configurar o QZ Tray para imprimir direto (1x por computador):</p>
                 <ol className="space-y-2 text-gray-300 list-decimal list-inside">
                   <li>Baixe o QZ Tray em <span className="text-white font-mono bg-gray-800 px-1 rounded">qz.io/download</span> e instale normalmente (Next → Next → Install).</li>
@@ -2533,14 +2832,14 @@ export default function Admin() {
                   ✅ Após conectar uma vez, o QZ Tray inicia automático com o Windows. Basta abrir o painel e clicar em Conectar.
                 </div>
                 <div className="bg-yellow-900/30 border border-yellow-700/40 rounded-lg px-3 py-2 text-yellow-300 text-xs">
-                  💡 O nome da impressora deve ser exatamente igual ao que aparece em <strong>Dispositivos e Impressoras</strong> no Windows (ex: KP-IM607).
+                  💡 O nome da impressora deve ser exatamente igual ao que aparece em <strong>Dispositivos e Impressoras</strong> no Windows (ex: ISD Tech 12).
                 </div>
               </div>
             )}
           </div>
 
           {/* ── Segurança ── */}
-          <div className="bg-[#1e1e1e] border border-[#2e2e2e] rounded-2xl p-5 space-y-4">
+          <div className="bg-scooby-card border border-scooby-borda rounded-2xl p-5 space-y-4">
             <h3 className="text-scooby-amarelo font-bold text-sm">🔒 Segurança</h3>
 
             <div className="space-y-1">
@@ -2556,7 +2855,7 @@ export default function Admin() {
               )}
               <div className="space-y-1 mb-3">
                 {bloqueados.map(tel => (
-                  <div key={tel} className="flex items-center justify-between bg-[#111111] rounded-lg px-3 py-2">
+                  <div key={tel} className="flex items-center justify-between bg-scooby-escuro rounded-lg px-3 py-2">
                     <span className="text-white text-sm font-mono">{tel}</span>
                     <button
                       onClick={() => desbloquearTelefone(tel)}
@@ -2574,7 +2873,7 @@ export default function Admin() {
                   value={novoBloquear}
                   onChange={e => setNovoBloquear(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && bloquearTelefone()}
-                  className="flex-1 bg-[#111111] border border-[#2e2e2e] text-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-red-500 font-mono"
+                  className="flex-1 bg-scooby-escuro border border-scooby-borda text-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-red-500 font-mono"
                 />
                 <button
                   onClick={bloquearTelefone}
@@ -2611,7 +2910,7 @@ export default function Admin() {
         <div className="max-w-lg mx-auto px-4 py-6 space-y-6">
 
           {/* Acesso Master */}
-          <div className="bg-[#1e1e1e] border border-purple-800 rounded-2xl p-5">
+          <div className="bg-scooby-card border border-purple-800 rounded-2xl p-5">
             <div className="flex items-center gap-3 mb-3">
               <span className="text-2xl">👑</span>
               <div>
@@ -2619,14 +2918,14 @@ export default function Admin() {
                 <p className="text-gray-500 text-xs">Senha master gerenciada pelo desenvolvedor. Acesso completo + deploy.</p>
               </div>
             </div>
-            <div className="bg-[#111111] rounded-xl px-4 py-3 text-sm text-gray-400">
+            <div className="bg-scooby-escuro rounded-xl px-4 py-3 text-sm text-gray-400">
               A senha master é gerenciada diretamente pelo desenvolvedor e não pode ser alterada por aqui.
               Em caso de necessidade, entre em contato com o desenvolvedor.
             </div>
           </div>
 
           {/* Alterar senha do cliente */}
-          <div className="bg-[#1e1e1e] border border-[#2e2e2e] rounded-2xl p-5 space-y-4">
+          <div className="bg-scooby-card border border-scooby-borda rounded-2xl p-5 space-y-4">
             <div className="flex items-center gap-3 mb-1">
               <span className="text-2xl">🔑</span>
               <div>
@@ -2643,7 +2942,7 @@ export default function Admin() {
                   placeholder="Digite a senha atual"
                   value={senhaAtualInput}
                   onChange={e => setSenhaAtualInput(e.target.value)}
-                  className="w-full bg-[#111111] border border-[#2e2e2e] text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-scooby-amarelo"
+                  className="w-full bg-scooby-escuro border border-scooby-borda text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-scooby-amarelo"
                 />
               </div>
               <div>
@@ -2653,7 +2952,7 @@ export default function Admin() {
                   placeholder="Mínimo 6 caracteres"
                   value={novaSenhaInput}
                   onChange={e => setNovaSenhaInput(e.target.value)}
-                  className="w-full bg-[#111111] border border-[#2e2e2e] text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-scooby-amarelo"
+                  className="w-full bg-scooby-escuro border border-scooby-borda text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-scooby-amarelo"
                 />
               </div>
               <div>
@@ -2663,7 +2962,7 @@ export default function Admin() {
                   placeholder="Digite a nova senha novamente"
                   value={confirmarSenhaInput}
                   onChange={e => setConfirmarSenhaInput(e.target.value)}
-                  className="w-full bg-[#111111] border border-[#2e2e2e] text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-scooby-amarelo"
+                  className="w-full bg-scooby-escuro border border-scooby-borda text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-scooby-amarelo"
                 />
               </div>
 
@@ -2773,7 +3072,7 @@ export default function Admin() {
                 <label className="text-gray-400 text-xs">Data:</label>
                 <input type="text" placeholder="dd/mm/aaaa" value={caixaData}
                   onChange={e => setCaixaData(e.target.value)}
-                  className="bg-[#111111] border border-[#2e2e2e] text-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-scooby-amarelo w-32" />
+                  className="bg-scooby-escuro border border-scooby-borda text-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-scooby-amarelo w-32" />
                 <button onClick={() => setCaixaData(hoje())}
                   className="text-xs px-3 py-2 bg-scooby-borda hover:bg-scooby-vermelho text-white rounded-xl transition">Hoje</button>
                 <button onClick={() => setCaixaData(ontem())}
@@ -2817,11 +3116,11 @@ export default function Admin() {
                     return (
                       <button key={c.key}
                         onClick={() => setCaixaDetalhe(ativo ? null : c.key)}
-                        className={`text-left rounded-2xl px-4 py-3 border-2 transition active:scale-95 ${ativo ? c.bg + ' ' + c.cor.split(' ')[0].replace('/60','') : 'bg-[#1e1e1e] ' + c.cor.split(' ')[0]} ${ativo ? 'ring-2 ring-offset-1 ring-offset-scooby-escuro ' + c.cor.split(' ')[1].replace('text-','ring-') : ''}`}
+                        className={`text-left rounded-2xl px-4 py-3 border-2 transition active:scale-95 ${ativo ? c.bg + ' ' + c.cor.split(' ')[0].replace('/60','') : 'bg-scooby-card ' + c.cor.split(' ')[0]} ${ativo ? 'ring-2 ring-offset-1 ring-offset-scooby-escuro ' + c.cor.split(' ')[1].replace('text-','ring-') : ''}`}
                       >
                         <div className="flex items-center justify-between mb-2">
                           <span className={`text-xs font-bold uppercase tracking-wide ${c.cor.split(' ')[1]}`}>{c.label}</span>
-                          <span className="text-gray-500 text-xs bg-[#111111] px-1.5 py-0.5 rounded-full">{c.count} ped.</span>
+                          <span className="text-gray-500 text-xs bg-scooby-escuro px-1.5 py-0.5 rounded-full">{c.count} ped.</span>
                         </div>
                         <p className="text-white font-black text-xl">{fmt(c.total)}</p>
                         <p className={`text-xs mt-0.5 flex items-center gap-1 ${c.cor.split(' ')[1]} opacity-60`}>
@@ -2833,7 +3132,7 @@ export default function Admin() {
 
                   {/* Maquininha total (não clicável, é soma) */}
                   {totalMaquininha > 0 && (
-                    <div className="bg-[#1e1e1e] border border-[#2e2e2e] rounded-2xl px-4 py-3">
+                    <div className="bg-scooby-card border border-scooby-borda rounded-2xl px-4 py-3">
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-gray-300 text-xs font-bold uppercase tracking-wide">🏧 Maquininha</span>
                       </div>
@@ -2852,7 +3151,7 @@ export default function Admin() {
                       'Cartão de Débito': 'border-purple-600 bg-purple-900/20',
                       'Cartão de Crédito': 'border-pink-600 bg-pink-900/20',
                       'Balcão': 'border-amber-600 bg-amber-900/20',
-                    }[caixaDetalhe] || 'border-[#2e2e2e] bg-[#111111]'
+                    }[caixaDetalhe] || 'border-scooby-borda bg-scooby-escuro'
                     return (
                       <div className={`col-span-2 sm:col-span-3 lg:col-span-4 border-2 rounded-2xl overflow-hidden ${cores}`}>
                         <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
@@ -2887,7 +3186,7 @@ export default function Admin() {
                 </div>
 
                 {/* Barra visual de distribuição */}
-                <div className="bg-[#1e1e1e] border border-[#2e2e2e] rounded-2xl px-5 py-4">
+                <div className="bg-scooby-card border border-scooby-borda rounded-2xl px-5 py-4">
                   <p className="text-gray-400 text-xs font-semibold uppercase tracking-wide mb-3">Distribuição por forma de pagamento</p>
                   <div className="flex rounded-full overflow-hidden h-4 mb-3">
                     {totalPix > 0 && <div title={`Pix: ${pct(totalPix)}`} style={{ width: pct(totalPix) }} className="bg-blue-500 transition-all" />}
@@ -2906,7 +3205,7 @@ export default function Admin() {
                 </div>
 
                 {/* Conferência do caixa físico */}
-                <div className="bg-[#1e1e1e] border border-[#2e2e2e] rounded-2xl px-5 py-5 space-y-4">
+                <div className="bg-scooby-card border border-scooby-borda rounded-2xl px-5 py-5 space-y-4">
                   <p className="text-white font-bold text-base">🏦 Conferência do Caixa Físico</p>
                   <p className="text-gray-400 text-xs -mt-2">Registre quanto tinha no início do dia e quanto tem fisicamente agora</p>
 
@@ -2917,7 +3216,7 @@ export default function Admin() {
                       </label>
                       <input type="text" placeholder="0,00" value={caixaSaldoInicial}
                         onChange={e => { setCaixaSaldoInicial(e.target.value); localStorage.setItem('scooby_saldo_inicial', e.target.value) }}
-                        className="w-full bg-[#111111] border border-[#2e2e2e] focus:border-scooby-amarelo text-white rounded-xl px-4 py-3 text-sm focus:outline-none transition" />
+                        className="w-full bg-scooby-escuro border border-scooby-borda focus:border-scooby-amarelo text-white rounded-xl px-4 py-3 text-sm focus:outline-none transition" />
                       <p className="text-gray-500 text-xs mt-1">Quanto tinha no caixa ao abrir</p>
                     </div>
                     <div>
@@ -2926,13 +3225,13 @@ export default function Admin() {
                       </label>
                       <input type="text" placeholder="0,00" value={caixaValorFisico}
                         onChange={e => { setCaixaValorFisico(e.target.value); localStorage.setItem('scooby_valor_fisico', e.target.value) }}
-                        className="w-full bg-[#111111] border border-[#2e2e2e] focus:border-scooby-amarelo text-white rounded-xl px-4 py-3 text-sm focus:outline-none transition" />
+                        className="w-full bg-scooby-escuro border border-scooby-borda focus:border-scooby-amarelo text-white rounded-xl px-4 py-3 text-sm focus:outline-none transition" />
                       <p className="text-gray-500 text-xs mt-1">Conte o dinheiro físico agora</p>
                     </div>
                   </div>
 
                   {/* Resumo do fechamento */}
-                  <div className="bg-[#111111] rounded-xl px-4 py-4 space-y-2 text-sm">
+                  <div className="bg-scooby-escuro rounded-xl px-4 py-4 space-y-2 text-sm">
                     <div className="flex justify-between text-gray-400">
                       <span>Saldo inicial</span>
                       <span>{fmt(saldoIni)}</span>
@@ -2947,7 +3246,7 @@ export default function Admin() {
                         <span>+ {fmt(totalBalcao)}</span>
                       </div>
                     )}
-                    <div className="flex justify-between text-white font-semibold border-t border-[#2e2e2e] pt-2">
+                    <div className="flex justify-between text-white font-semibold border-t border-scooby-borda pt-2">
                       <span>= Esperado no caixa</span>
                       <span>{fmt(dinEsperado)}</span>
                     </div>
@@ -2957,7 +3256,7 @@ export default function Admin() {
                           <span>Contagem física</span>
                           <span>{fmt(valorFis)}</span>
                         </div>
-                        <div className={`flex justify-between font-black text-base border-t border-[#2e2e2e] pt-2 ${
+                        <div className={`flex justify-between font-black text-base border-t border-scooby-borda pt-2 ${
                           Math.abs(diferenca) < 0.01 ? 'text-green-400' : diferenca > 0 ? 'text-yellow-400' : 'text-red-400'
                         }`}>
                           <span>
@@ -2973,17 +3272,17 @@ export default function Admin() {
 
                   {/* Separação das saídas para banco */}
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-center text-sm">
-                    <div className="bg-[#111111] rounded-xl p-3">
+                    <div className="bg-scooby-escuro rounded-xl p-3">
                       <p className="text-gray-400 text-xs mb-1">📲 Pix (digital)</p>
                       <p className="text-blue-400 font-black text-lg">{fmt(totalPix)}</p>
                       <p className="text-gray-600 text-xs">já na conta</p>
                     </div>
-                    <div className="bg-[#111111] rounded-xl p-3">
+                    <div className="bg-scooby-escuro rounded-xl p-3">
                       <p className="text-gray-400 text-xs mb-1">🏧 Maquininha</p>
                       <p className="text-purple-400 font-black text-lg">{fmt(totalMaquininha)}</p>
                       <p className="text-gray-600 text-xs">débito + crédito</p>
                     </div>
-                    <div className="bg-[#111111] rounded-xl p-3">
+                    <div className="bg-scooby-escuro rounded-xl p-3">
                       <p className="text-gray-400 text-xs mb-1">💵 No caixa físico</p>
                       <p className="text-green-400 font-black text-lg">{fmt(totalDin + totalBalcao)}</p>
                       <p className="text-gray-600 text-xs">dinheiro + balcão</p>
@@ -2992,8 +3291,8 @@ export default function Admin() {
                 </div>
 
                 {/* Lista detalhada de pedidos */}
-                <div className="bg-[#1e1e1e] border border-[#2e2e2e] rounded-2xl overflow-hidden">
-                  <div className="px-5 py-4 border-b border-[#2e2e2e] flex items-center justify-between flex-wrap gap-3">
+                <div className="bg-scooby-card border border-scooby-borda rounded-2xl overflow-hidden">
+                  <div className="px-5 py-4 border-b border-scooby-borda flex items-center justify-between flex-wrap gap-3">
                     <p className="text-white font-bold">📋 Pedidos detalhados — {caixaData}</p>
                     <button onClick={imprimirFechamento}
                       className="flex items-center gap-2 bg-scooby-vermelho hover:bg-red-700 text-white font-bold text-sm px-4 py-2 rounded-xl transition">
@@ -3002,7 +3301,7 @@ export default function Admin() {
                   </div>
 
                   {/* Cabeçalho tabela */}
-                  <div className="hidden sm:grid grid-cols-[60px_1fr_1fr_100px_90px_90px] gap-2 px-4 py-2 bg-[#111111] text-gray-500 text-xs font-semibold uppercase tracking-wide">
+                  <div className="hidden sm:grid grid-cols-[60px_1fr_1fr_100px_90px_90px] gap-2 px-4 py-2 bg-scooby-escuro text-gray-500 text-xs font-semibold uppercase tracking-wide">
                     <span>Hora</span>
                     <span>Cliente</span>
                     <span>Itens</span>
@@ -3040,7 +3339,7 @@ export default function Admin() {
                               ? <span className="text-xs bg-blue-900/60 text-blue-300 px-1.5 py-0.5 rounded-full">🍽️ Mesa {p.mesa}</span>
                               : p.origem === 'garcom'
                               ? <span className="text-xs bg-amber-900/60 text-amber-300 px-1.5 py-0.5 rounded-full">👨‍🍳 Garçom</span>
-                              : <span className="text-xs bg-[#111111] text-gray-500 px-1.5 py-0.5 rounded-full">🌐 Site</span>
+                              : <span className="text-xs bg-scooby-escuro text-gray-500 px-1.5 py-0.5 rounded-full">🌐 Site</span>
                             }
                           </div>
                         </div>
@@ -3049,7 +3348,7 @@ export default function Admin() {
                   </div>
 
                   {/* Rodapé com total */}
-                  <div className="px-4 py-3 bg-[#111111] border-t border-[#2e2e2e] flex justify-between items-center">
+                  <div className="px-4 py-3 bg-scooby-escuro border-t border-scooby-borda flex justify-between items-center">
                     <span className="text-gray-400 text-sm">{pedidosDia.length} pedidos</span>
                     <span className="text-scooby-amarelo font-black text-lg">{fmt(totalGeral)}</span>
                   </div>

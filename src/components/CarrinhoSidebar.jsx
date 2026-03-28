@@ -14,7 +14,7 @@ export function CarrinhoSidebar({ itens, subtotal, remover, adicionar, onFinaliz
       {/* Vazio */}
       {itens.length === 0 && (
         <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
-          <span className="text-5xl mb-3">🍫</span>
+          <span className="text-5xl mb-3">🍔</span>
           <p className="text-gray-400 text-sm">Adicione itens do cardápio ao lado para começar seu pedido!</p>
         </div>
       )}
@@ -26,7 +26,7 @@ export function CarrinhoSidebar({ itens, subtotal, remover, adicionar, onFinaliz
             {itens.map(linha => (
               <div key={linha.chave} className="flex items-center gap-2">
                 <div className="flex-1 min-w-0">
-                  <p className="text-gray-800 text-sm font-medium leading-tight">
+                  <p className="text-white text-sm font-medium leading-tight">
                     {linha.item.nome}
                     {linha.variacao && <span className="text-gray-400 text-xs ml-1">({linha.variacao})</span>}
                   </p>
@@ -37,9 +37,9 @@ export function CarrinhoSidebar({ itens, subtotal, remover, adicionar, onFinaliz
                 <div className="flex items-center gap-1.5 flex-shrink-0">
                   <button
                     onClick={() => remover(linha.chave)}
-                    className="w-7 h-7 rounded-full bg-scooby-borda hover:bg-red-800 text-gray-700 hover:text-white font-bold flex items-center justify-center transition text-sm"
+                    className="w-7 h-7 rounded-full bg-scooby-borda hover:bg-red-800 text-white font-bold flex items-center justify-center transition text-sm"
                   >−</button>
-                  <span className="text-gray-800 font-bold w-5 text-center text-sm">{linha.qtd}</span>
+                  <span className="text-white font-bold w-5 text-center text-sm">{linha.qtd}</span>
                   <button
                     onClick={() => adicionar(linha.item, linha.variacao ? { label: linha.variacao, preco: linha.preco } : null)}
                     className="w-7 h-7 rounded-full bg-scooby-vermelho hover:bg-red-700 text-white font-bold flex items-center justify-center transition text-sm"
@@ -59,7 +59,7 @@ export function CarrinhoSidebar({ itens, subtotal, remover, adicionar, onFinaliz
               <span>Taxa de entrega</span>
               <span>R$ {taxaEntrega.toFixed(2).replace('.', ',')}</span>
             </div>
-            <div className="flex justify-between text-gray-800 font-bold text-base pt-1 border-t border-scooby-borda">
+            <div className="flex justify-between text-white font-bold text-base pt-1 border-t border-scooby-borda">
               <span>Total</span>
               <span className="text-scooby-amarelo">R$ {total.toFixed(2).replace('.', ',')}</span>
             </div>
