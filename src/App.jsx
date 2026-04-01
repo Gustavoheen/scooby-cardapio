@@ -63,6 +63,35 @@ function BannerCupom({ cupons }) {
   )
 }
 
+function ContadorFechamento({ horarioFechamento, lojaStatus }) {
+  const [tempo, setTempo] = useState('')
+  useEffect(() => {
+    if (lojaStatus === 'aberta' || lojaStatus === 'fechada') { setTempo(''); return }
+    function calcTempo() {
+      const agora = new Date()
+      const [hF, mF] = horarioFechamento.split(':').map(Number)
+      const fechamento = new Date()
+      fechamento.setHours(hF, mF, 0, 0)
+      const diff = fechamento.getTime() - agora.getTime()
+      if (diff <= 0) { setTempo(''); return }
+      const h = Math.floor(diff / 3600000)
+      const m = Math.floor((diff % 3600000) / 60000)
+      const s = Math.floor((diff % 60000) / 1000)
+      setTempo(`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`)
+    }
+    calcTempo()
+    const id = setInterval(calcTempo, 1000)
+    return () => clearInterval(id)
+  }, [horarioFechamento, lojaStatus])
+  if (!tempo) return null
+  return (
+    <div className="flex items-center gap-1.5 bg-black/30 px-2.5 py-1 rounded-xl ml-auto">
+      <span className="text-orange-400 text-xs font-semibold">⏱ Encerra em</span>
+      <span className="text-white font-black text-sm font-mono tracking-widest">{tempo}</span>
+    </div>
+  )
+}
+
 import Admin from './pages/Admin'
 import AcompanharPedido from './pages/AcompanharPedido'
 import Garcom from './pages/Garcom'
@@ -126,6 +155,33 @@ export default function App() {
     }
     checarVersao()
     const id = setInterval(checarVersao, 60000)
+    return () => clearInterval(id)
+  }, [])
+
+  // Mantém ref atualizada com estado atual (usada no effect de limpeza)
+  const cardapioStateRef = useRef(cardapioState)
+  useEffect(() => { cardapioStateRef.current = cardapioState }, [cardapioState])
+
+  // Auto-limpeza: quando a loja fecha no horário agendado (modo auto), apaga combos e cupons
+  useEffect(() => {
+    function verificarFechamento() {
+      const state = cardapioStateRef.current
+      const isAuto = !state.lojaStatus || state.lojaStatus === 'auto'
+      if (!isAuto) return
+      if (calcLojaAberta(state)) return
+      const temPromos = (state.promocoes || []).length > 0
+      const temCupons = (state.cupons || []).length > 0
+      if (!temPromos && !temCupons) return
+      fetch('/api/cardapio-state', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...state, promocoes: [], cupons: [] }),
+      }).then(() => {
+        setCardapioState(prev => ({ ...prev, promocoes: [], cupons: [] }))
+      }).catch(() => {})
+    }
+    verificarFechamento()
+    const id = setInterval(verificarFechamento, 60000)
     return () => clearInterval(id)
   }, [])
 
@@ -365,9 +421,13 @@ export default function App() {
         {/* Combos/Promoções */}
         {combosAtivos.length > 0 && (
           <div className="mb-6">
-            <h2 className="text-white font-bold text-lg mb-3 flex items-center gap-2">
+            <h2 className="text-white font-bold text-lg mb-3 flex items-center gap-2 flex-wrap">
               <span className="w-1 h-6 bg-scooby-vermelho rounded-full inline-block"></span>
               🎉 Promoções do Dia
+              <ContadorFechamento
+                horarioFechamento={cardapioState.horarioFechamento || CONFIG.horarioFechamento}
+                lojaStatus={cardapioState.lojaStatus}
+              />
             </h2>
             <div className="flex flex-col gap-2">
               {combosAtivos.map(combo => {
