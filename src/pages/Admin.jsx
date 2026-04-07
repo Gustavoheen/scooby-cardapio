@@ -33,7 +33,7 @@ function filtrarPedidos(pedidos, dataFiltro, pagamentoFiltro) {
 }
 
 // ── ESC/POS — impressão direta na térmica ────────────────────────
-const COLS = 24 // papel 80mm com fonte 2x: 24 caracteres por linha
+const COLS = 24 // papel 80mm: largura real da impressora térmica
 
 function encode(str) {
   // Normaliza acentos para ASCII puro (NFD decompose + remove combining chars)
@@ -94,15 +94,14 @@ function gerarEscPos(pedido) {
 
   // Init
   push(0x1B, 0x40)       // ESC @ reset
-  push(0x1D, 0x21, 0x11) // GS ! — fonte 2x largura + 2x altura (padrao legivel em 80mm)
+  push(0x1D, 0x21, 0x00) // GS ! 0x00 — força fonte 1x1 (sem ampliação)
 
-  // Cabeçalho
-  centro(); bold(true); grande(true)
-  txt('SCOOBY-DOO'); nl()
-  txt('LANCHES'); nl()
-  grande(false)
+  // Cabeçalho compacto
+  centro(); bold(true)
+  txt('SCOOBY-DOO LANCHES'); nl()
+  bold(false)
   txt('Hamburguer Artesanal'); nl()
-  bold(false); esq(); linha()
+  esq(); linha()
 
   row('Pedido:', pedido.numeroPedido || pedido.id || '—')
   row('Data:', `${pedido.data} ${pedido.hora}`)
@@ -115,7 +114,6 @@ function gerarEscPos(pedido) {
   row('Subtotal:', `R$ ${pedido.subtotal}`)
   if (pedido.tipoEntrega === 'Entrega') row('Taxa entrega:', `R$ ${pedido.taxaEntrega}`)
   if (pedido.desconto && parseFloat(pedido.desconto) > 0) row('Desconto:', `-R$ ${pedido.desconto}`)
-  linha()
   bold(true); row('TOTAL:', `R$ ${pedido.total}`); bold(false)
   linha()
 
@@ -123,17 +121,16 @@ function gerarEscPos(pedido) {
   row('Tipo:', pedido.tipoEntrega)
   linha()
 
-  bold(true); txt('CLIENTE:'); nl(); bold(false)
-  txt(pedido.nomeCliente); nl()
+  bold(true); txt('CLIENTE:'); bold(false); txt(` ${pedido.nomeCliente}`); nl()
   if (pedido.telefone) { txt(`Tel: ${pedido.telefone}`); nl() }
   if (pedido.tipoEntrega === 'Entrega' && pedido.endereco) wrapTxt(`End: ${pedido.endereco}`)
-  if (pedido.observacao) { linha(); bold(true); txt('OBS:'); bold(false); nl(); wrapTxt(pedido.observacao) }
+  if (pedido.observacao) { bold(true); txt('OBS: '); bold(false); wrapTxt(pedido.observacao) }
 
   linha()
-  centro(); txt('Obrigado pela preferencia!'); nl()
+  centro(); txt('Obrigado!'); nl()
   esq()
 
-  nl(3)
+  nl(2)
   push(0x1D, 0x56, 0x41, 0x10) // GS V — corte parcial
 
   return new Uint8Array(bytes)
@@ -761,6 +758,8 @@ export default function Admin() {
   }
 
   const buscarPedidos = useCallback(async () => {
+    if (isFetchingRef.current) return
+    isFetchingRef.current = true
     try {
       const res = await fetch('/api/pedido')
       if (res.ok) {
@@ -824,6 +823,8 @@ export default function Admin() {
     } catch (err) {
       console.error('Erro ao buscar pedidos:', err)
       setDebugInfo(`Erro: ${err.message}`)
+    } finally {
+      isFetchingRef.current = false
     }
   }, [])
 
@@ -1167,6 +1168,7 @@ export default function Admin() {
   const pedidosVistosRef = useRef(new Set())
   const autoPrintRef = useRef(autoPrint)
   const isFirstFetchRef = useRef(true)
+  const isFetchingRef = useRef(false) // guard contra fetches concorrentes
   // handleImprimirRef: sempre aponta para a versão mais recente de handleImprimir,
   // resolvendo o stale closure do useCallback([]) em buscarPedidos
   const handleImprimirRef = useRef(null)
@@ -1227,6 +1229,8 @@ export default function Admin() {
   async function handleImprimir(pedido, tipo = 'manual') {
     const id = pedido.numeroPedido || pedido.id
     if (!id) return
+    // Evita auto-impressão duplicada (race condition entre polls)
+    if (tipo === 'auto' && pedidosImpressosRef.current[id]) return
     try {
       await imprimirEscPos(pedido, tipo)
     } catch {
@@ -2346,6 +2350,7 @@ export default function Admin() {
                   adicionais: [],
                   precoCombo: '',
                   descricao: '',
+                  validadeAte: null,
                   ativo: true
                 }, ...prev])}
                 className="bg-scooby-vermelho hover:bg-red-700 text-white text-xs font-bold px-3 py-1 rounded-lg transition"

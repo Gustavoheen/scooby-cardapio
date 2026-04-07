@@ -89,25 +89,66 @@ function SeletorVariacao({ item, onConfirmar, onFechar, precosVariacoes }) {
 // ── Card item ──────────────────────────────────────────────────
 function CardItem({ item, adicionar, remover, desativado, precosVariacoes, getQtd }) {
   const [showVar, setShowVar] = useState(false)
-  const temVar = item.proteinas || item.tamanhos
+  const temProteinas = !!item.proteinas
+  const temTamanhos = !!item.tamanhos
+  const temVar = temProteinas || temTamanhos
 
   function precoBase() {
     if (item.proteinas) {
       const f = item.proteinas[0]; const k = `${item.id}-${f.label}`
       return precosVariacoes[k] !== undefined ? precosVariacoes[k] : f.preco
     }
-    if (item.tamanhos) {
-      const f = item.tamanhos[0]; const k = `${item.id}-${f.label}`
-      return precosVariacoes[k] !== undefined ? precosVariacoes[k] : f.preco
-    }
     return precosVariacoes[String(item.id)] !== undefined ? precosVariacoes[String(item.id)] : item.preco ?? 0
+  }
+
+  // Itens com tamanhos (Meio/Inteiro): exibe cada variação inline com +/- próprio
+  if (temTamanhos) {
+    return (
+      <div className={desativado ? 'opacity-40' : ''}>
+        <div className="flex items-center gap-3 px-4 pt-3 pb-1">
+          {item.imagem && (
+            <img src={item.imagem} alt={item.nome} className="w-10 h-10 rounded-lg object-cover flex-shrink-0 bg-[#222]"
+              onError={e => { e.target.style.display = 'none' }} />
+          )}
+          <div className="flex-1 min-w-0">
+            <p className="text-white font-semibold text-sm">{item.nome}</p>
+            {item.descricao && <p className="text-gray-500 text-xs mt-0.5 line-clamp-1">{item.descricao}</p>}
+          </div>
+        </div>
+        {item.tamanhos.map(tam => {
+          const k = `${item.id}-${tam.label}`
+          const p = precosVariacoes[k] !== undefined ? precosVariacoes[k] : tam.preco
+          const qtd = getQtd(k)
+          return (
+            <div key={tam.label} className="flex items-center gap-3 px-4 py-2.5 border-b border-[#2a2a2a] pl-6">
+              <span className="text-gray-300 text-sm flex-1">{tam.label}</span>
+              <span className="text-yellow-400 font-bold text-sm mr-2">R$ {p.toFixed(2).replace('.', ',')}</span>
+              {qtd > 0 ? (
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <button onClick={() => remover(k)}
+                    className="w-8 h-8 rounded-full bg-[#333] text-white font-bold flex items-center justify-center text-lg active:scale-90">−</button>
+                  <span className="text-white font-bold w-5 text-center text-sm">{qtd}</span>
+                  <button onClick={() => !desativado && adicionar(item, { label: tam.label, preco: p })}
+                    className="w-8 h-8 rounded-full bg-red-600 text-white font-bold flex items-center justify-center text-lg active:scale-90">+</button>
+                </div>
+              ) : (
+                <button onClick={() => !desativado && adicionar(item, { label: tam.label, preco: p })} disabled={desativado}
+                  className={`w-9 h-9 rounded-full flex items-center justify-center text-2xl font-bold flex-shrink-0 active:scale-90 ${
+                    desativado ? 'bg-[#333] text-gray-600 cursor-not-allowed' : 'bg-red-600 text-white shadow'
+                  }`}>+</button>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    )
   }
 
   const qtd = temVar ? 0 : getQtd(`${item.id}-`)
 
   function onAdd() {
     if (desativado) return
-    if (temVar) { setShowVar(true); return }
+    if (temProteinas) { setShowVar(true); return }
     const p = precosVariacoes[String(item.id)] !== undefined ? precosVariacoes[String(item.id)] : item.preco ?? 0
     adicionar({ ...item, preco: p })
   }
@@ -123,7 +164,7 @@ function CardItem({ item, adicionar, remover, desativado, precosVariacoes, getQt
           <p className="text-white font-semibold text-sm">{item.nome}</p>
           {item.descricao && <p className="text-gray-500 text-xs mt-0.5 line-clamp-2">{item.descricao}</p>}
           <p className="text-yellow-400 font-bold text-sm mt-1">
-            {temVar ? 'A partir de ' : ''}R$ {precoBase().toFixed(2).replace('.', ',')}
+            {temProteinas ? 'A partir de ' : ''}R$ {precoBase().toFixed(2).replace('.', ',')}
           </p>
           {desativado && <p className="text-red-400 text-xs">Esgotado</p>}
         </div>
