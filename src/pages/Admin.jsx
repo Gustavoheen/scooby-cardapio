@@ -11,11 +11,15 @@ const SENHA_JULIO_PADRAO = 'scooby2024'
 const WHATSAPP_DEV = '5532999301657'
 
 function hoje() {
-  return new Date().toLocaleDateString('pt-BR')
+  // Até 05:00 = conta como dia anterior (restaurante noturno)
+  const d = new Date()
+  if (d.getHours() < 5) d.setDate(d.getDate() - 1)
+  return d.toLocaleDateString('pt-BR')
 }
 
 function ontem() {
   const d = new Date()
+  if (d.getHours() < 5) d.setDate(d.getDate() - 1) // ajusta base
   d.setDate(d.getDate() - 1)
   return d.toLocaleDateString('pt-BR')
 }
@@ -108,7 +112,7 @@ function gerarEscPos(pedido) {
   linha()
 
   bold(true); txt('ITENS:'); nl(); bold(false)
-  pedido.itensPedido.split(' | ').forEach(printItem)
+  ;(pedido.itensPedido || '').split(' | ').filter(Boolean).forEach(printItem)
   linha()
 
   row('Subtotal:', `R$ ${pedido.subtotal}`)
@@ -320,7 +324,9 @@ function CardPedido({ pedido, onImprimir, onExcluir, onConfirmarPix, onAtualizar
               {pedido.pagamento === 'Pix' && (
                 pedido.pixConfirmado
                   ? <span className="text-xs px-1.5 py-0.5 rounded-full font-semibold bg-green-900 text-green-300">✓ Pago</span>
-                  : <span className="text-xs px-1.5 py-0.5 rounded-full font-semibold bg-yellow-900 text-yellow-300 animate-pulse">⏳ Aguard.</span>
+                  : pedido.pixComprovante
+                    ? <span className="text-xs px-1.5 py-0.5 rounded-full font-semibold bg-blue-900 text-blue-300">🧾 Comprovante</span>
+                    : <span className="text-xs px-1.5 py-0.5 rounded-full font-semibold bg-yellow-900 text-yellow-300 animate-pulse">⏳ Aguard. PIX</span>
               )}
               <span className={`text-xs px-1.5 py-0.5 rounded-full font-semibold ${corTipo}`}>
                 {pedido.tipoEntrega === 'Entrega' ? '🛵' : '🏠'}
@@ -409,14 +415,26 @@ function CardPedido({ pedido, onImprimir, onExcluir, onConfirmarPix, onAtualizar
                   {pedido.pagamento === 'Pix' && (
                     pedido.pixConfirmado
                       ? <span className="text-xs font-semibold text-green-400">
-                          ✅ Comprovante confirmado {pedido.pixConfirmadoEm ? `às ${new Date(pedido.pixConfirmadoEm).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}` : ''}
+                          ✅ Pix confirmado {pedido.pixConfirmadoEm ? `às ${new Date(pedido.pixConfirmadoEm).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}` : ''}
                         </span>
-                      : <button
-                          onClick={() => onConfirmarPix(pedido)}
-                          className="text-xs font-bold px-3 py-1 rounded-lg bg-green-700 hover:bg-green-600 text-white transition"
-                        >
-                          ✅ Confirmar Pix
-                        </button>
+                      : <>
+                          {pedido.pixComprovante && (
+                            <span className="text-xs font-semibold text-blue-400">
+                              🧾 Comprovante recebido via WhatsApp {pedido.pixComprovanteEm ? `às ${new Date(pedido.pixComprovanteEm).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}` : ''}
+                            </span>
+                          )}
+                          {!pedido.pixComprovante && pedido.origem === 'whatsapp' && (
+                            <span className="text-xs font-semibold text-yellow-400 animate-pulse">
+                              ⏳ Aguardando comprovante PIX
+                            </span>
+                          )}
+                          <button
+                            onClick={() => onConfirmarPix(pedido)}
+                            className="text-xs font-bold px-3 py-1 rounded-lg bg-green-700 hover:bg-green-600 text-white transition"
+                          >
+                            ✅ Confirmar Pix
+                          </button>
+                        </>
                   )}
                 </div>
               </div>
@@ -660,6 +678,20 @@ export default function Admin() {
   const [msgSenha, setMsgSenha] = useState('')
   const [salvandoSenha, setSalvandoSenha] = useState(false)
 
+  // ── Estado da aba Bot WhatsApp ───────────────────────────
+  const [botStatus, setBotStatus] = useState({ connected: false, exists: false, state: 'unknown', qrcode: null })
+  const [botSessoes, setBotSessoes] = useState([])
+  const [botAlertas, setBotAlertas] = useState([])
+  const [botChatAberto, setBotChatAberto] = useState(null) // telefone da sessão aberta
+  const [botCarregando, setBotCarregando] = useState(false)
+  const [botModo, setBotModo] = useState('auto')
+  const [botDicas, setBotDicas] = useState('')
+  const [botDicasSalvas, setBotDicasSalvas] = useState('')
+  const [botMsgManual, setBotMsgManual] = useState('')
+  const [botMsgTel, setBotMsgTel] = useState('')
+  const [salvandoBotConfig, setSalvandoBotConfig] = useState(false)
+  const [msgBot, setMsgBot] = useState('')
+
   // ── Estado da aba Caixa ────────────────────────────────────
   const [caixaData, setCaixaData] = useState(hoje)
   const [caixaSaldoInicial, setCaixaSaldoInicial] = useState(
@@ -773,19 +805,30 @@ export default function Admin() {
         } else {
           // Polls subsequentes: detecta pedidos cujo ID não estava no baseline
           const novos = lista.filter(p => !pedidosVistosRef.current.has(p.id))
-          if (novos.length > 0) {
-            // Atualiza baseline com todos os IDs atuais
-            pedidosVistosRef.current = new Set(lista.map(p => p.id))
-            novos.forEach(p => {
+          // Filtrar: só considerar "novo" se foi criado nos últimos 5 minutos
+          const agora = Date.now()
+          const novosRecentes = novos.filter(p => {
+            const criado = p.criadoEm ? new Date(p.criadoEm).getTime() : 0
+            return (agora - criado) < 5 * 60 * 1000
+          })
+          // Atualizar baseline sempre (pra não bipar de novo)
+          pedidosVistosRef.current = new Set(lista.map(p => p.id))
+          if (novosRecentes.length > 0) {
+            novosRecentes.forEach(p => {
               if (autoPrintRef.current) handleImprimirRef.current?.(p, 'auto')
             })
+            const agora2 = Date.now()
             setPedidosNovos(prev => {
               const next = new Set(prev)
-              novos.forEach(p => next.add(p.numeroPedido || p.id))
+              novosRecentes.forEach(p => {
+                const id = p.numeroPedido || p.id
+                next.add(id)
+                pedidosNovosTempoRef.current.set(id, agora2)
+              })
               return next
             })
             tocarSomNotificacaoRef.current?.()
-            setDebugInfo(`🔔 ${novos.length} novo(s)! Total: ${lista.length}`)
+            setDebugInfo(`🔔 ${novosRecentes.length} novo(s)! Total: ${lista.length}`)
           } else {
             setDebugInfo(`${lista.length} pedidos na API`)
           }
@@ -853,6 +896,9 @@ export default function Admin() {
         setHorarioAberturaEditado(estado.horarioAbertura || CONFIG.horarioAbertura)
         setHorarioFechamentoEditado(estado.horarioFechamento || CONFIG.horarioFechamento)
         setDiasFuncionamento(estado.diasFuncionamento ?? [0,1,2,3,4,5,6])
+        setBotModo(estado.bot_ativo || 'auto')
+        setBotDicas(estado.bot_dicas || '')
+        setBotDicasSalvas(estado.bot_dicas || '')
         // Restaura sessão
         const salvo = sessionStorage.getItem('admin_auth')
         if (salvo === 'master') {
@@ -871,7 +917,35 @@ export default function Admin() {
     setCarregando(true)
     buscarPedidos().finally(() => setCarregando(false))
     const interval = setInterval(buscarPedidos, 15000)
-    return () => clearInterval(interval)
+
+    // Polling de alertas/reclamações a cada 30s
+    let alertasAnterior = 0
+    async function checkAlertas() {
+      try {
+        const r = await fetch('/api/whatsapp/alertas?status=aberto')
+        const data = await r.json()
+        if (data.length > alertasAnterior && alertasAnterior > 0) {
+          tocarSomReclamacao()
+        }
+        alertasAnterior = data.length
+        setBotAlertas(data)
+      } catch {}
+    }
+    checkAlertas()
+    const alertaInterval = setInterval(checkAlertas, 30000)
+
+    // Polling sessões WhatsApp a cada 15s
+    async function checkSessoes() {
+      try {
+        const r = await fetch('/api/whatsapp/sessoes')
+        const data = await r.json()
+        setBotSessoes(data || [])
+      } catch {}
+    }
+    checkSessoes()
+    const sessaoInterval = setInterval(checkSessoes, 15000)
+
+    return () => { clearInterval(interval); clearInterval(alertaInterval); clearInterval(sessaoInterval) }
   }, [autenticado, buscarPedidos])
 
   // Auto-atualização: detecta novo deploy e avisa o admin
@@ -1131,13 +1205,16 @@ export default function Admin() {
       try {
         await qz.websocket.connect()
         setImpressoraConectada(true)
-      } catch {
-        // QZ Tray não está rodando
+        console.log('[QZ] Reconectado com sucesso')
+      } catch (err) {
+        console.error('[QZ] Falha ao reconectar:', err?.message)
+        setImpressoraConectada(false)
         if (tipo === 'manual') {
-          // Fallback para janela do browser (funciona só com gesto do usuário)
           imprimirPedido(pedido)
+        } else {
+          // Auto: mostrar aviso visual que impressora desconectou
+          setDebugInfo('⚠️ Impressora desconectada! Reconecte o QZ Tray.')
         }
-        // Em auto-mode: não abre window.open (bloqueado pelo browser sem gesto)
         return
       }
     }
@@ -1180,12 +1257,8 @@ export default function Admin() {
   const [pedidosNovos, setPedidosNovos] = useState(new Set())
   const tocarSomNotificacaoRef = useRef(null)
   const audioCtxRef = useRef(null)
+  const pedidosNovosTempoRef = useRef(new Map()) // id → timestamp quando chegou
 
-  // ── Alerta de inatividade ─────────────────────────────────────
-  const [alarmePendente, setAlarmePendente] = useState(false)
-  const alarmePendenteRef = useRef(false)
-  const ultimaAtividadeRef = useRef(Date.now())
-  const alarmeDismissidoRef = useRef(0) // timestamp do último dismiss
   const handleAtualizarStatusRef = useRef(null)
 
   // Desbloqueia o AudioContext na primeira interação do usuário
@@ -1228,15 +1301,21 @@ export default function Admin() {
 
   async function handleImprimir(pedido, tipo = 'manual') {
     const id = pedido.numeroPedido || pedido.id
-    if (!id) return
+    console.log('[Impressão]', tipo, 'id:', id, 'qzAtivo:', qz.websocket.isActive())
+    if (!id) { console.log('[Impressão] sem ID, ignorando'); return }
     // Evita auto-impressão duplicada (race condition entre polls)
-    if (tipo === 'auto' && pedidosImpressosRef.current[id]) return
+    if (tipo === 'auto' && pedidosImpressosRef.current[id]) { console.log('[Impressão] já impresso:', id); return }
     try {
+      console.log('[Impressão] chamando imprimirEscPos...')
       await imprimirEscPos(pedido, tipo)
-    } catch {
-      // erro já logado dentro de imprimirEscPos
+      console.log('[Impressão] OK!')
+    } catch (err) {
+      console.error('[Impressão]', tipo, 'erro:', err?.message || err)
+      if (tipo === 'auto') {
+        setDebugInfo(`⚠️ Impressão auto falhou: ${err?.message || 'QZ Tray desconectado'}`)
+      }
     }
-    const hora = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+    const hora = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' })
     const novos = { ...pedidosImpressosRef.current, [id]: { hora, tipo } }
     pedidosImpressosRef.current = novos
     setPedidosImpressos(novos)
@@ -1273,74 +1352,46 @@ export default function Admin() {
   }
   tocarSomNotificacaoRef.current = tocarSomNotificacao
 
-  function tocarSomAlarme() {
+  function tocarSomReclamacao() {
     try {
       const ctx = audioCtxRef.current
       if (!ctx) return
       if (ctx.state === 'suspended') ctx.resume()
-      // 3 bipes urgentes curtos
-      for (let i = 0; i < 3; i++) {
+      // Sirene alternada — som de urgência diferente
+      const freqs = [600, 900, 600, 900, 600]
+      freqs.forEach((freq, i) => {
         const osc = ctx.createOscillator()
         const gain = ctx.createGain()
         osc.connect(gain)
         gain.connect(ctx.destination)
-        osc.type = 'square'
-        osc.frequency.value = 880
-        const t = ctx.currentTime + i * 0.35
+        osc.type = 'sawtooth'
+        osc.frequency.value = freq
+        const t = ctx.currentTime + i * 0.2
         gain.gain.setValueAtTime(0, t)
-        gain.gain.linearRampToValueAtTime(0.3, t + 0.02)
-        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.28)
+        gain.gain.linearRampToValueAtTime(0.25, t + 0.03)
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.18)
         osc.start(t)
-        osc.stop(t + 0.28)
-      }
-    } catch { /* navegador bloqueou áudio */ }
+        osc.stop(t + 0.18)
+      })
+    } catch {}
   }
 
-  function dismissAlarme() {
-    setAlarmePendente(false)
-    alarmePendenteRef.current = false
-    ultimaAtividadeRef.current = Date.now()
-    alarmeDismissidoRef.current = Date.now()
-  }
-
-  // Rastreia atividade do usuário — qualquer click/toque reseta o timer
-  useEffect(() => {
-    function registrar() {
-      ultimaAtividadeRef.current = Date.now()
-      if (alarmePendenteRef.current) dismissAlarme()
-    }
-    window.addEventListener('click', registrar)
-    window.addEventListener('touchstart', registrar)
-    window.addEventListener('keydown', registrar)
-    return () => {
-      window.removeEventListener('click', registrar)
-      window.removeEventListener('touchstart', registrar)
-      window.removeEventListener('keydown', registrar)
-    }
-  }, [])
-
-  // Verifica inatividade a cada 30s
+  // Lembrete: se um pedido novo não foi clicado em 5min, bipa de novo (uma vez)
   useEffect(() => {
     const CINCO_MIN = 5 * 60 * 1000
     const interval = setInterval(() => {
-      const inativo = Date.now() - ultimaAtividadeRef.current >= CINCO_MIN
-      const jaPassouDismiss = Date.now() - alarmeDismissidoRef.current >= CINCO_MIN
-      if (!inativo || !jaPassouDismiss) return
-      // Pedidos pendentes = recebido E não impresso
-      const pendentes = pedidos.filter(p => {
-        const id = p.numeroPedido || p.id
-        return (!p.status || p.status === 'recebido') && !pedidosImpressosRef.current[id]
-      })
-      if (pendentes.length > 0) {
-        setAlarmePendente(true)
-        alarmePendenteRef.current = true
-        tocarSomAlarme()
+      const agora = Date.now()
+      let temPendente = false
+      for (const [, ts] of pedidosNovosTempoRef.current) {
+        if (agora - ts >= CINCO_MIN) { temPendente = true; break }
       }
+      if (temPendente) tocarSomNotificacaoRef.current?.()
     }, 30000)
     return () => clearInterval(interval)
-  }, [pedidos])
+  }, [])
 
   function marcarPedidoComoVisto(id) {
+    pedidosNovosTempoRef.current.delete(id)
     setPedidosNovos(prev => {
       const next = new Set(prev)
       next.delete(id)
@@ -1359,6 +1410,12 @@ export default function Admin() {
         ? { ...p, status, statusAtualizadoEm: new Date().toISOString() }
         : p
       ))
+      // Notificar cliente via WhatsApp — só saiu pra entrega ou pronto pra retirada
+      if (status === 'saiu_entrega' || status === 'pronto_retirada') fetch('/api/whatsapp/notificar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pedidoId: pedido.id, novoStatus: status }),
+      }).catch(() => {})
     }
   }
   handleAtualizarStatusRef.current = handleAtualizarStatus
@@ -1612,6 +1669,7 @@ export default function Admin() {
               { id: 'caixa',         label: '💰 Caixa',           short: '💰' },
               { id: 'configuracoes', label: '⚙️ Config',          short: '⚙️' },
               { id: 'seguranca',     label: '🔐 Segurança',       short: '🔐' },
+              { id: 'whatsbot',      label: `🤖 Bot WhatsApp${botAlertas.length > 0 ? ` (${botAlertas.length})` : ''}`, short: botAlertas.length > 0 ? `🤖❗` : '🤖' },
             ].map(aba => (
               <button
                 key={aba.id}
@@ -1754,6 +1812,36 @@ export default function Admin() {
       {/* ── ABA PEDIDOS ── */}
       {abaAtiva === 'pedidos' && (
         <div className="max-w-7xl mx-auto px-4 py-6 space-y-5">
+
+          {/* Banner de alertas/reclamações */}
+          {botAlertas.length > 0 && (
+            <div className="bg-red-950/60 border border-red-600/50 rounded-2xl p-4 animate-pulse">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl">🚨</span>
+                  <div>
+                    <p className="text-red-300 font-bold text-sm">
+                      {botAlertas.length} reclamação{botAlertas.length > 1 ? 'ões' : ''} pendente{botAlertas.length > 1 ? 's' : ''}!
+                    </p>
+                    <p className="text-red-400/70 text-xs">
+                      {botAlertas.map(a => `${a.tipo === 'atraso' ? '⏰' : '👎'} ${a.nome_contato || a.telefone}`).join(' · ')}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    setAbaAtiva('whatsbot')
+                    setTimeout(() => {
+                      document.getElementById('painel-alertas')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                    }, 100)
+                  }}
+                  className="bg-red-600 hover:bg-red-700 text-white text-xs font-bold px-4 py-2 rounded-xl transition"
+                >
+                  Ver alertas →
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Stats do dia */}
           <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3">
@@ -1933,20 +2021,6 @@ export default function Admin() {
                 </div>
               )}
 
-              {/* Banner de alerta de inatividade */}
-              {alarmePendente && (
-                <div
-                  onClick={dismissAlarme}
-                  className="cursor-pointer flex items-center justify-between bg-red-700 text-white rounded-xl px-4 py-3 animate-pulse shadow-lg shadow-red-900/50"
-                >
-                  <div>
-                    <p className="font-bold text-sm">⚠️ Você tem pedidos a preparar!</p>
-                    <p className="text-red-200 text-xs mt-0.5">Há pedidos novos não confirmados. Clique aqui para dispensar.</p>
-                  </div>
-                  <span className="text-2xl ml-3">🔔</span>
-                </div>
-              )}
-
               {/* Banner de novos pedidos */}
               {pedidosNovos.size > 0 && (
                 <div className="flex items-center justify-between bg-blue-600 text-white rounded-xl px-4 py-2.5 animate-pulse">
@@ -1954,7 +2028,7 @@ export default function Admin() {
                     🔔 {pedidosNovos.size} novo{pedidosNovos.size > 1 ? 's' : ''} pedido{pedidosNovos.size > 1 ? 's' : ''}!
                   </div>
                   <button
-                    onClick={() => setPedidosNovos(new Set())}
+                    onClick={() => { pedidosNovosTempoRef.current.clear(); setPedidosNovos(new Set()) }}
                     className="text-xs bg-blue-800 hover:bg-blue-900 px-2.5 py-1 rounded-lg transition"
                   >
                     Dispensar todos
@@ -2994,6 +3068,423 @@ export default function Admin() {
         </div>
       )}
 
+      {/* ── ABA BOT WHATSAPP ── */}
+      {abaAtiva === 'whatsbot' && (
+        <div className="max-w-2xl mx-auto px-4 py-6 space-y-6">
+
+          {/* TOGGLE LIGA/DESLIGA — grande e visível */}
+          <div className={`rounded-2xl p-5 border-2 transition-all ${
+            botModo === 'desligado'
+              ? 'bg-red-950/40 border-red-600/60'
+              : 'bg-green-950/40 border-green-600/60'
+          }`}>
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-white font-bold text-lg">
+                  {botModo === 'desligado' ? '🔴 Bot DESLIGADO' : '🟢 Bot LIGADO'}
+                </h3>
+                <p className="text-gray-400 text-xs mt-1">
+                  {botModo === 'desligado'
+                    ? 'O bot não responde nenhuma mensagem. Clientes podem conversar normalmente.'
+                    : botModo === 'ligado'
+                      ? 'Respondendo 24h — ignorando horário de funcionamento'
+                      : 'Respondendo automaticamente no horário de funcionamento'}
+                </p>
+              </div>
+              <button
+                onClick={async () => {
+                  const novoModo = botModo === 'desligado' ? 'auto' : 'desligado'
+                  setBotModo(novoModo)
+                  try {
+                    await fetch('/api/cardapio-state', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ bot_ativo: novoModo }),
+                    })
+                    setMsgBot(novoModo === 'desligado' ? '🔴 Bot desligado!' : '🟢 Bot ligado!')
+                    setTimeout(() => setMsgBot(''), 3000)
+                  } catch {}
+                }}
+                className={`px-6 py-3 rounded-xl font-bold text-lg transition-all ${
+                  botModo === 'desligado'
+                    ? 'bg-green-600 hover:bg-green-700 text-white'
+                    : 'bg-red-600 hover:bg-red-700 text-white'
+                }`}
+              >
+                {botModo === 'desligado' ? '▶ LIGAR' : '⏹ DESLIGAR'}
+              </button>
+            </div>
+            {msgBot && <p className="text-sm font-semibold mt-3 text-center">{msgBot}</p>}
+          </div>
+
+          {/* Status da Conexão */}
+          <div className="bg-scooby-card border border-scooby-borda rounded-2xl p-5">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-scooby-amarelo font-bold text-base">📱 Conexão WhatsApp</h3>
+              <button
+                onClick={async () => {
+                  setBotCarregando(true)
+                  try {
+                    const r = await fetch('/api/whatsapp/instance?qr=1')
+                    const d = await r.json()
+                    setBotStatus(d)
+                  } catch { setBotStatus(prev => ({ ...prev, error: 'Erro ao conectar' })) }
+                  setBotCarregando(false)
+                }}
+                className="text-xs text-gray-400 hover:text-white transition"
+              >
+                {botCarregando ? '⏳' : '🔄'} Atualizar
+              </button>
+            </div>
+
+            {botStatus.connected ? (
+              <div className="text-center py-4">
+                <div className="text-4xl mb-2">✅</div>
+                <span className="inline-block bg-green-500/20 text-green-400 border border-green-500/40 px-4 py-1.5 rounded-full text-sm font-semibold">
+                  Conectado
+                </span>
+                <p className="text-gray-400 text-xs mt-2">Instância: {botStatus.instance}</p>
+              </div>
+            ) : botStatus.qrcode ? (
+              <div className="text-center">
+                <span className="inline-block bg-red-500/20 text-red-400 border border-red-500/40 px-4 py-1.5 rounded-full text-sm font-semibold mb-3">
+                  Desconectado
+                </span>
+                <div className="bg-white rounded-2xl p-4 inline-block mx-auto">
+                  <img src={botStatus.qrcode} alt="QR Code" className="w-64 h-64" />
+                </div>
+                <p className="text-gray-400 text-xs mt-3">
+                  Abra o WhatsApp &gt; Dispositivos conectados &gt; Escanear QR Code
+                </p>
+              </div>
+            ) : (
+              <div className="text-center py-4">
+                <span className="inline-block bg-yellow-500/20 text-yellow-400 border border-yellow-500/40 px-4 py-1.5 rounded-full text-sm font-semibold">
+                  {botStatus.state === 'connecting' ? 'Conectando...' : 'Desconectado'}
+                </span>
+                <p className="text-gray-400 text-xs mt-2">Clique em Atualizar para gerar o QR Code</p>
+              </div>
+            )}
+          </div>
+
+          {/* Modo do Bot */}
+          <div className="bg-scooby-card border border-scooby-borda rounded-2xl p-5">
+            <h3 className="text-scooby-amarelo font-bold text-base mb-3">⚙️ Modo do Bot</h3>
+            <div className="flex gap-2">
+              {[
+                { id: 'auto', label: '⏰ Auto', desc: 'Responde no horário de funcionamento' },
+                { id: 'ligado', label: '🟢 Ligado', desc: 'Responde 24h' },
+                { id: 'desligado', label: '🔴 Desligado', desc: 'Bot silenciado' },
+              ].map(m => (
+                <button
+                  key={m.id}
+                  onClick={() => setBotModo(m.id)}
+                  className={`flex-1 px-3 py-3 rounded-xl text-xs font-semibold transition border ${
+                    botModo === m.id
+                      ? 'bg-scooby-amarelo/20 text-scooby-amarelo border-scooby-amarelo/40'
+                      : 'bg-scooby-escuro text-gray-400 border-scooby-borda hover:text-white'
+                  }`}
+                >
+                  {m.label}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={async () => {
+                setSalvandoBotConfig(true)
+                try {
+                  await fetch('/api/cardapio-state', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ bot_ativo: botModo }),
+                  })
+                  setMsgBot('✅ Modo do bot salvo!')
+                  setTimeout(() => setMsgBot(''), 3000)
+                } catch { setMsgBot('❌ Erro ao salvar') }
+                setSalvandoBotConfig(false)
+              }}
+              disabled={salvandoBotConfig}
+              className="w-full mt-3 bg-scooby-amarelo hover:bg-yellow-500 disabled:opacity-50 text-black font-bold py-2.5 rounded-xl transition text-sm"
+            >
+              {salvandoBotConfig ? 'Salvando...' : 'Salvar modo'}
+            </button>
+            {msgBot && <p className="text-green-400 text-xs mt-2 font-semibold">{msgBot}</p>}
+          </div>
+
+          {/* Dicas para a IA */}
+          <div className="bg-scooby-card border border-scooby-borda rounded-2xl p-5">
+            <h3 className="text-scooby-amarelo font-bold text-base mb-1">🧠 Dicas para a IA</h3>
+            <p className="text-gray-500 text-xs mb-3">
+              Instruções extras que a IA vai seguir ao atender clientes. Ela aprende e melhora com suas dicas!
+            </p>
+            <textarea
+              value={botDicas}
+              onChange={e => setBotDicas(e.target.value)}
+              placeholder={"Ex:\n- Sempre sugira o Cheese Tudo pra quem pedir sugestão\n- Se perguntar sobre promoção, avise que temos cupom SCOOBY10\n- Pergunte se quer adicionar bebida quando o pedido for só lanche\n- Nosso carro-chefe é o Especial, recomende bastante"}
+              className="w-full bg-scooby-escuro border border-scooby-borda text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-scooby-amarelo min-h-[120px] resize-y"
+            />
+            <button
+              onClick={async () => {
+                try {
+                  await fetch('/api/cardapio-state', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ bot_dicas: botDicas }),
+                  })
+                  setBotDicasSalvas(botDicas)
+                  setMsgBot('✅ Dicas salvas! A IA vai usar na próxima conversa.')
+                  setTimeout(() => setMsgBot(''), 4000)
+                } catch { setMsgBot('❌ Erro ao salvar dicas') }
+              }}
+              className="w-full mt-3 bg-green-600 hover:bg-green-700 text-white font-bold py-2.5 rounded-xl transition text-sm"
+            >
+              💾 Salvar dicas
+            </button>
+          </div>
+
+          {/* Alertas / Reclamações */}
+          <div id="painel-alertas" className="bg-scooby-card border border-red-800/50 rounded-2xl p-5">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-red-400 font-bold text-base">🚨 Alertas & Reclamações</h3>
+              <button
+                onClick={async () => {
+                  try {
+                    const r = await fetch('/api/whatsapp/alertas?status=aberto')
+                    setBotAlertas(await r.json())
+                  } catch {}
+                }}
+                className="text-xs text-gray-400 hover:text-white transition"
+              >
+                🔄 Atualizar
+              </button>
+            </div>
+
+            {botAlertas.length === 0 ? (
+              <p className="text-gray-500 text-sm text-center py-3">Nenhum alerta aberto 👍</p>
+            ) : (
+              <div className="space-y-2 max-h-64 overflow-y-auto">
+                {botAlertas.map(a => (
+                  <div key={a.id} className={`bg-scooby-escuro rounded-xl px-3 py-3 border-l-4 ${
+                    a.tipo === 'atraso' ? 'border-yellow-500' : a.tipo === 'qualidade' ? 'border-red-500' : 'border-orange-500'
+                  }`}>
+                    <div className="flex items-center justify-between mb-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-bold text-white">{a.nome_contato || a.telefone}</span>
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${
+                          a.tipo === 'atraso' ? 'bg-yellow-500/20 text-yellow-400'
+                          : a.tipo === 'qualidade' ? 'bg-red-500/20 text-red-400'
+                          : 'bg-orange-500/20 text-orange-400'
+                        }`}>
+                          {a.tipo === 'atraso' ? '⏰ Atraso' : a.tipo === 'qualidade' ? '👎 Qualidade' : '⚠️ Reclamação'}
+                        </span>
+                        {a.numero_pedido && <span className="text-xs text-gray-500">#{a.numero_pedido}</span>}
+                      </div>
+                      <span className="text-xs text-gray-500">{new Date(a.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
+                    </div>
+                    <p className="text-gray-300 text-xs mb-2 line-clamp-2">"{a.mensagem}"</p>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={async () => {
+                          // Assumir conversa + resolver alerta
+                          await fetch('/api/whatsapp/sessoes', {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ telefone: a.telefone, humano_ativo: true }),
+                          })
+                          await fetch('/api/whatsapp/alertas', {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ id: a.id, resposta: 'Atendente assumiu', respondido_por: 'admin' }),
+                          })
+                          const r = await fetch('/api/whatsapp/alertas?status=aberto')
+                          setBotAlertas(await r.json())
+                        }}
+                        className="text-xs bg-purple-600 hover:bg-purple-700 text-white px-3 py-1.5 rounded-lg font-semibold"
+                      >
+                        👤 Assumir conversa
+                      </button>
+                      <button
+                        onClick={async () => {
+                          await fetch('/api/whatsapp/alertas', {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ id: a.id, resposta: 'Resolvido', respondido_por: 'admin' }),
+                          })
+                          const r = await fetch('/api/whatsapp/alertas?status=aberto')
+                          setBotAlertas(await r.json())
+                        }}
+                        className="text-xs bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-lg font-semibold"
+                      >
+                        ✅ Resolvido
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Sessões ativas */}
+          <div className="bg-scooby-card border border-scooby-borda rounded-2xl p-5">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-scooby-amarelo font-bold text-base">💬 Conversas ativas</h3>
+              <button
+                onClick={async () => {
+                  try {
+                    const r = await fetch('/api/whatsapp/sessoes')
+                    setBotSessoes(await r.json())
+                  } catch {}
+                }}
+                className="text-xs text-gray-400 hover:text-white transition"
+              >
+                🔄 Atualizar
+              </button>
+            </div>
+
+            {botSessoes.length === 0 ? (
+              <p className="text-gray-500 text-sm text-center py-4">Nenhuma conversa ativa</p>
+            ) : (
+              <div className="space-y-2 max-h-64 overflow-y-auto">
+                {botSessoes.map(s => (
+                  <div key={s.telefone} className={`flex items-center justify-between rounded-xl px-3 py-2 cursor-pointer transition ${botChatAberto === s.telefone ? 'bg-scooby-amarelo/10 border border-scooby-amarelo/30' : 'bg-scooby-escuro hover:bg-scooby-borda/50'}`} onClick={() => setBotChatAberto(botChatAberto === s.telefone ? null : s.telefone)}>
+                    <div>
+                      <span className="text-white text-sm font-medium">{s.nome_contato || s.telefone}</span>
+                      <span className={`ml-2 text-xs px-2 py-0.5 rounded-full ${
+                        s.humano_ativo ? 'bg-purple-500/20 text-purple-400'
+                        : s.estado === 'pedindo_ia' ? 'bg-blue-500/20 text-blue-400'
+                        : s.estado === 'confirmando_pedido' ? 'bg-green-500/20 text-green-400'
+                        : 'bg-gray-500/20 text-gray-400'
+                      }`}>
+                        {s.humano_ativo ? '👤 Humano' : s.estado === 'pedindo_ia' ? '🤖 IA pedindo' : s.estado}
+                      </span>
+                    </div>
+                    <div className="flex gap-1">
+                      {s.humano_ativo ? (
+                        <button
+                          onClick={async () => {
+                            await fetch('/api/whatsapp/sessoes', {
+                              method: 'PATCH',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ telefone: s.telefone, humano_ativo: false }),
+                            })
+                            const r = await fetch('/api/whatsapp/sessoes')
+                            setBotSessoes(await r.json())
+                          }}
+                          className="text-xs bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded-lg"
+                        >
+                          🤖 Devolver
+                        </button>
+                      ) : (
+                        <button
+                          onClick={async () => {
+                            await fetch('/api/whatsapp/sessoes', {
+                              method: 'PATCH',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ telefone: s.telefone, humano_ativo: true }),
+                            })
+                            const r = await fetch('/api/whatsapp/sessoes')
+                            setBotSessoes(await r.json())
+                          }}
+                          className="text-xs bg-purple-600 hover:bg-purple-700 text-white px-2 py-1 rounded-lg"
+                        >
+                          👤 Assumir
+                        </button>
+                      )}
+                      <button
+                        onClick={async () => {
+                          await fetch(`/api/whatsapp/sessoes?telefone=${s.telefone}`, { method: 'DELETE' })
+                          const r = await fetch('/api/whatsapp/sessoes')
+                          setBotSessoes(await r.json())
+                        }}
+                        className="text-xs bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded-lg"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Histórico da conversa */}
+            {botChatAberto && (() => {
+              const sessaoChat = botSessoes.find(s => s.telefone === botChatAberto)
+              const historico = sessaoChat?.ia_historico || []
+              return (
+                <div className="mt-3 bg-scooby-escuro rounded-xl border border-scooby-borda overflow-hidden">
+                  <div className="flex items-center justify-between px-3 py-2 border-b border-scooby-borda">
+                    <span className="text-scooby-amarelo text-xs font-bold">💬 Conversa — {sessaoChat?.nome_contato || botChatAberto}</span>
+                    <div className="flex items-center gap-2">
+                      <span className={`text-xs px-2 py-0.5 rounded-full ${sessaoChat?.humano_ativo ? 'bg-purple-500/20 text-purple-400' : 'bg-blue-500/20 text-blue-400'}`}>
+                        {sessaoChat?.humano_ativo ? '👤 Humano' : '🤖 IA'}
+                      </span>
+                      <button onClick={() => setBotChatAberto(null)} className="text-gray-500 hover:text-white text-sm">✕</button>
+                    </div>
+                  </div>
+                  <div className="max-h-80 overflow-y-auto p-3 space-y-2" style={{ background: '#0b141a' }}>
+                    {historico.length === 0 ? (
+                      <p className="text-gray-600 text-xs text-center py-4">Sem mensagens ainda</p>
+                    ) : historico.map((m, i) => (
+                      <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                        <div className={`max-w-[80%] px-3 py-2 rounded-xl text-xs whitespace-pre-wrap ${
+                          m.role === 'user'
+                            ? 'bg-green-900/40 text-green-200 rounded-br-sm'
+                            : 'bg-gray-800 text-gray-200 rounded-bl-sm'
+                        }`}>
+                          {m.text}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )
+            })()}
+
+            {/* Enviar msg manual */}
+            <div className="mt-4 pt-3 border-t border-scooby-borda">
+              <p className="text-gray-400 text-xs mb-2">{botChatAberto ? `Responder ${botSessoes.find(s => s.telefone === botChatAberto)?.nome_contato || botChatAberto}:` : 'Enviar mensagem manual:'}</p>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="Telefone (5532...)"
+                  value={botMsgTel}
+                  onChange={e => setBotMsgTel(e.target.value)}
+                  className="w-1/3 bg-scooby-escuro border border-scooby-borda text-white rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-scooby-amarelo"
+                />
+                <input
+                  type="text"
+                  placeholder="Mensagem..."
+                  value={botMsgManual}
+                  onChange={e => setBotMsgManual(e.target.value)}
+                  className="flex-1 bg-scooby-escuro border border-scooby-borda text-white rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-scooby-amarelo"
+                />
+                <button
+                  onClick={async () => {
+                    if (!botMsgTel || !botMsgManual) return
+                    await fetch('/api/whatsapp/sessoes', {
+                      method: 'PATCH',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ telefone: botMsgTel, mensagem: botMsgManual }),
+                    })
+                    setBotMsgManual('')
+                    setMsgBot('✅ Mensagem enviada!')
+                    setTimeout(() => setMsgBot(''), 3000)
+                  }}
+                  className="bg-green-600 hover:bg-green-700 text-white text-xs font-bold px-4 py-2 rounded-xl"
+                >
+                  Enviar
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-blue-900/30 border border-blue-700/40 rounded-xl px-4 py-3 text-blue-300 text-xs">
+            🤖 O bot usa IA (Gemini) para anotar pedidos pelo WhatsApp e injetar direto no sistema.
+            As dicas que você salvar acima ajudam a IA a atender melhor os seus clientes!
+          </div>
+        </div>
+      )}
+
       {/* ── ABA CAIXA ── */}
       {abaAtiva === 'caixa' && (() => {
         const pedidosDia = pedidos.filter(p => !caixaData || p.data === caixaData)
@@ -3179,7 +3670,8 @@ export default function Admin() {
                                 <span className="text-white font-semibold flex-1 min-w-0 truncate">{p.nomeCliente}</span>
                                 <span className="text-gray-400 text-xs flex-1 min-w-0 truncate hidden sm:block">{p.itensPedido?.replace(/ \| /g, ' · ')}</span>
                                 {p.troco && <span className="text-gray-500 text-xs flex-shrink-0">troco p/ {p.troco}</span>}
-                                {p.origem === 'garcom' && p.mesa && <span className="text-xs bg-blue-900/60 text-blue-300 px-1.5 py-0.5 rounded-full flex-shrink-0">🍽️ {p.mesa}</span>}
+                                {(p.origem === 'garcom' || p.origem === 'mesa') && p.mesa && <span className="text-xs bg-blue-900/60 text-blue-300 px-1.5 py-0.5 rounded-full flex-shrink-0">🍽️ {p.mesa}</span>}
+                                {(p.origem === 'whatsapp' || p.origem === 'whatsapp-teste') && <span className="text-xs bg-green-900/60 text-green-300 px-1.5 py-0.5 rounded-full flex-shrink-0">💬</span>}
                                 <span className="text-scooby-amarelo font-black flex-shrink-0">R$ {p.total}</span>
                               </div>
                             ))}
@@ -3340,10 +3832,14 @@ export default function Admin() {
                           </div>
                           <p className="text-scooby-amarelo font-black text-right">R$ {p.total}</p>
                           <div className="text-right">
-                            {p.origem === 'garcom' && p.mesa
+                            {(p.origem === 'garcom' || p.origem === 'mesa') && p.mesa
                               ? <span className="text-xs bg-blue-900/60 text-blue-300 px-1.5 py-0.5 rounded-full">🍽️ Mesa {p.mesa}</span>
                               : p.origem === 'garcom'
                               ? <span className="text-xs bg-amber-900/60 text-amber-300 px-1.5 py-0.5 rounded-full">👨‍🍳 Garçom</span>
+                              : p.origem === 'balcao'
+                              ? <span className="text-xs bg-orange-900/60 text-orange-300 px-1.5 py-0.5 rounded-full">🏪 Balcão</span>
+                              : (p.origem === 'whatsapp' || p.origem === 'whatsapp-teste')
+                              ? <span className="text-xs bg-green-900/60 text-green-300 px-1.5 py-0.5 rounded-full">💬 WhatsApp</span>
                               : <span className="text-xs bg-scooby-escuro text-gray-500 px-1.5 py-0.5 rounded-full">🌐 Site</span>
                             }
                           </div>
